@@ -6,7 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/wangwalker/gpostgres/internal/parser"
+	"github.com/wangwalker/gpostgres/pkg/lexer"
+	"github.com/wangwalker/gpostgres/pkg/parser"
 )
 
 const (
@@ -45,7 +46,13 @@ LOOP:
 			}
 		} else if strings.HasSuffix(text, EndIdentifier) {
 			// Stand for a normal query statement
-			fmt.Printf("you input a SQL statement: %s\n", text)
+			source := strings.Replace(text, EndIdentifier, "", 1)
+			createStmt, err := lexer.Lex(source)
+			if err != nil {
+				fmt.Printf("Error: invalid statement %s, error: %s\n", source, err)
+				continue LOOP
+			}
+			fmt.Printf("Create Table: %s ok!\n", createStmt.Name.Value)
 		} else {
 			// When an unexpected \n or \r is coming, holds it for next loop
 			lastInput = text + " "
