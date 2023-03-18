@@ -8,6 +8,7 @@ import (
 
 	"github.com/wangwalker/gpostgres/pkg/lexer"
 	"github.com/wangwalker/gpostgres/pkg/parser"
+	"github.com/wangwalker/gpostgres/pkg/storage"
 )
 
 const (
@@ -51,6 +52,10 @@ LOOP:
 			if err != nil {
 				fmt.Printf("Error: invalid statement %s, error: %s\n", source, err)
 				continue LOOP
+			}
+			err = storage.CreateTable(createStmt)
+			if err != nil {
+				fmt.Printf("Error: invalid statement %s, error: %s", source, err)
 			}
 			fmt.Printf("Create Table: %s ok!\n", createStmt.Name.Value)
 		} else {
