@@ -3,22 +3,23 @@ package lexer
 import (
 	"errors"
 	"strings"
+
+	"github.com/wangwalker/gpostgres/pkg/ast"
 )
 
 type TokenKind uint
 
 const (
-	TokenKindKeyword = iota
+	TokenKindKeywordCreate TokenKind = iota
+	TokenKindKeywordSelect
+	TokenKindKeywordAlter
+	TokenKindKeywordDrop
 	TokenKindTable
-)
-
-type Keyword string
-
-const (
-	KeywordCreate = "create"
-	KeywordSelect = "select"
-	KeywordAlter  = "alter"
-	KeywordDrop   = "drop"
+	TokenKindTableName
+	TokenKindLeftBracket
+	TokenKindRightBracket
+	TokenKindColumnKeyText
+	TokenKindColumnValue
 )
 
 type Token struct {
@@ -26,50 +27,105 @@ type Token struct {
 	Kind  TokenKind
 }
 
-func tokenize(source string) []Token {
-	stokens := strings.Split(source, " ")
+var (
+	QueryInfoEmptyError               = errors.New("information is not enough")
+	QueryCreateInfoIncompleteError    = errors.New("create table is not enough")
+	QuerySyntaxBracketIncompleteError = errors.New("missing ( or )")
+	QuerySyntaxUnkownError            = errors.New("syntax is wrong")
+)
+
+// Create Table users ( name Text age Text );
+func tokenize(source string) ([]Token, error) {
+	stokens := strings.Fields(clean(source))
 	tokens := make([]Token, len(stokens))
-	for _, t := range stokens {
+	isCreateQuery := false
+	hasLeftBracket := false
+	hasRightBracket := false
+	for i, t := range stokens {
 		token := Token{t, 0}
+		if isCreateQuery && i == 2 {
+			token.Kind = TokenKindTableName
+			token.Value = t
+			tokens = append(tokens, token)
+			continue
+		}
 		switch t {
 		case "create":
-			token.Kind = TokenKindKeyword
-			token.Value = KeywordCreate
+			token.Kind = TokenKindKeywordCreate
+			isCreateQuery = true
 		case "table":
 			token.Kind = TokenKindTable
+		case "(":
+			token.Kind = TokenKindLeftBracket
+			hasLeftBracket = true
+		case ")":
+			token.Kind = TokenKindRightBracket
+			hasRightBracket = true
+		case "text":
+			token.Kind = TokenKindColumnKeyText
+		default:
+			// otherwise, token is the column value
+			token.Kind = TokenKindColumnValue
+			token.Value = t
 		}
 		tokens = append(tokens, token)
 	}
-	return tokens[len(stokens):]
-}
-
-type QueryStmtKind uint
-
-const (
-	QueryStmtKindCreate = iota
-	QueryStmtKindEmpty
-	QueryStmtKindUnkown
-)
-
-type QueryStmtCreateTable struct {
-	Name Token
-}
-
-func Lex(source string) (QueryStmtCreateTable, error) {
-	tokens := tokenize(source)
-	if len(tokens) < 1 {
-		return QueryStmtCreateTable{}, errors.New("information is not enough")
+	if !hasLeftBracket || !hasRightBracket {
+		return nil, QuerySyntaxBracketIncompleteError
 	}
+	return tokens[len(stokens):], nil
+}
 
-	createStmt := QueryStmtCreateTable{}
+func Lex(source string) (ast.QueryStmtCreateTable, error) {
+	tokens, err := tokenize(source)
+	if err != nil {
+		return ast.QueryStmtCreateTable{}, err
+	}
+	if len(tokens) < 1 {
+		return ast.QueryStmtCreateTable{}, QueryInfoEmptyError
+	}
 
 	switch tokens[0].Kind {
-	case TokenKindKeyword:
-		if len(tokens) > 2 {
-			createStmt.Name = tokens[2]
-			return createStmt, nil
+	case TokenKindKeywordCreate:
+		if len(tokens) < 3 {
+			return ast.QueryStmtCreateTable{}, QueryCreateInfoIncompleteError
 		}
-		return QueryStmtCreateTable{}, errors.New("wrong create")
+		createStmt, err := composeCreateStmt(tokens)
+		return createStmt, err
 	}
-	return QueryStmtCreateTable{}, errors.New("unknown")
+	return ast.QueryStmtCreateTable{}, QuerySyntaxUnkownError
+}
+
+func clean(souce string) string {
+	s := strings.Replace(souce, ";", "", 1)
+	s = strings.ReplaceAll(s, ",", " ")
+	s = strings.ReplaceAll(s, "(", " ( ")
+	s = strings.ReplaceAll(s, ")", " ) ")
+	return s
+}
+
+func composeCreateStmt(tokens []Token) (ast.QueryStmtCreateTable, error) {
+	createStmt := ast.QueryStmtCreateTable{}
+	columnCount := 0
+	columns := make([]ast.Column, 0)
+	columnPaired := false
+	for _, t := range tokens {
+		switch t.Kind {
+		case TokenKindTableName:
+			createStmt.Name = t.Value
+		case TokenKindColumnKeyText:
+			columnPaired = true
+		case TokenKindColumnValue:
+			columnCount += 1
+			column := ast.Column{Kind: ast.ColumnKindText, Value: ast.ColumnValue(t.Value)}
+			columns = append(columns, column)
+			columnPaired = false
+		}
+	}
+	// only have both column value and kind like `name Text`, the column is valid
+	if !columnPaired {
+		return ast.QueryStmtCreateTable{}, errors.New("wrong create table")
+	}
+	createStmt.Columns = columns[:columnCount]
+	return createStmt, nil
 }

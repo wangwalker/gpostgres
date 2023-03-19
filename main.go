@@ -11,56 +11,52 @@ import (
 	"github.com/wangwalker/gpostgres/pkg/storage"
 )
 
-const (
-	Prompt            = "# "
-	CommandIdentifier = "\\"
-	EndIdentifier     = ";"
-)
-
 func main() {
 	lastInput := ""
 	scanner := bufio.NewScanner(os.Stdin)
-LOOP:
+REPL:
 	for {
-		fmt.Print(Prompt)
+		if lastInput == "" {
+			fmt.Print("# ")
+		} else {
+			fmt.Print("> ")
+		}
+
 		// Scans a line from Stdin(Console)
 		scanner.Scan()
 		// Holds the string that scanned
-		text := strings.ToLower(scanner.Text())
+		query := strings.ToLower(scanner.Text())
 		if lastInput != "" {
-			text = lastInput + text
+			query = lastInput + query
 			lastInput = ""
 		}
 
-		if strings.HasPrefix(text, CommandIdentifier) {
-			// Stand for command, like \q, \h, \quit
-			comand := strings.Replace(text, CommandIdentifier, "", 1)
-			comand = strings.TrimSpace(comand)
-			switch parser.ParseCommand(comand) {
+		switch parser.Prepare(query) {
+		case parser.QueryTypeCommand:
+			switch parser.ParseCommand(query) {
 			case parser.QuitCommand:
 				fmt.Println("quit")
-				break LOOP
+				break REPL
 			case parser.HelpCommand:
 				fmt.Println("help")
 			case parser.UnknownCommand:
-				fmt.Printf("you input an invalid command: [%s]\n", comand)
+				fmt.Printf("invalid command: [%s]\n", query)
 			}
-		} else if strings.HasSuffix(text, EndIdentifier) {
-			// Stand for a normal query statement
-			source := strings.Replace(text, EndIdentifier, "", 1)
-			createStmt, err := lexer.Lex(source)
+		case parser.QueryTypeNormal:
+			createStmt, err := lexer.Lex(query)
 			if err != nil {
-				fmt.Printf("Error: invalid statement %s, error: %s\n", source, err)
-				continue LOOP
+				fmt.Printf("Error: invalid query %s, error: %s\n", query, err)
+				continue REPL
 			}
 			err = storage.CreateTable(createStmt)
 			if err != nil {
-				fmt.Printf("Error: invalid statement %s, error: %s", source, err)
+				fmt.Printf("Error: invalid query %s, error: %s\n", query, err)
+				continue REPL
 			}
-			fmt.Printf("Create Table: %s ok!\n", createStmt.Name.Value)
-		} else {
+			fmt.Printf("Create Table: %s ok!\n", createStmt.Name)
+		case parser.QueryTypeUnkown:
 			// When an unexpected \n or \r is coming, holds it for next loop
-			lastInput = text + " "
+			lastInput = query + " "
 		}
 	}
 }

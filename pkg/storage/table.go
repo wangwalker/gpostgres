@@ -1,13 +1,25 @@
 package storage
 
-type Table struct {
-	Name string
-	Len  uint8
-	Rows []string
+import "github.com/wangwalker/gpostgres/pkg/ast"
+
+const (
+	tableRowDefaultCount uint8 = 100
+)
+
+type Row []string
+
+type MemoTable struct {
+	Name    string
+	Len     uint8
+	Columns []ast.Column
+	Rows    []Row
 }
 
-func NewTable(name string) *Table {
-	return &Table{
-		Name: name,
+func NewTable(stmt ast.QueryStmtCreateTable) *MemoTable {
+	rows := make([]Row, tableRowDefaultCount)
+	return &MemoTable{
+		Name:    stmt.Name,
+		Columns: stmt.Columns,
+		Rows:    rows,
 	}
 }
