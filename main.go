@@ -17,9 +17,9 @@ func main() {
 REPL:
 	for {
 		if lastInput == "" {
-			fmt.Print("# ")
+			fmt.Print("postgres# ")
 		} else {
-			fmt.Print("> ")
+			fmt.Print("postgres> ")
 		}
 
 		// Scans a line from Stdin(Console)

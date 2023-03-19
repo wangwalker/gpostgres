@@ -8,17 +8,18 @@ const (
 	QueryStmtKindUnkown
 )
 
-type ColumnValue string
+type ColumnName string
 type ColumnKind uint8
 
 type Column struct {
-	Value ColumnValue
-	Kind  ColumnKind
+	Name ColumnName
+	Kind ColumnKind
 }
 
 const (
-	ColumnKindText ColumnKind = iota
+	ColumnKindText ColumnKind = iota + 1
 	ColumnKindInt
+	ColumnKindUnknown
 )
 
 type QueryStmtCreateTable struct {

@@ -8,11 +8,10 @@ In this section, our goal is that can just create table with `TEXT` and `INT` co
 
 To achieve this goal, we can split it into several steps below.
 
-1. A simple REPL;
-2. Create table without columns;
-3. Create table with `TEXT` columns;
-4. Create table with `TEXT` and `INT` column types;
-5. Return table scheme when run `\d table`
+- [x] A simple REPL
+- [x] Create table without columns
+- [x] Create table with `TEXT` and `INT` column types
+- [ ] Return tables scheme when run`\d` or `\d table`
 
 ### Section 2
 

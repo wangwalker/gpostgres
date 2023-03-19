@@ -15,9 +15,14 @@ func TestLexCreateTable(t *testing.T) {
 		{source: "create table users", stmt: ast.QueryStmtCreateTable{Name: "user"}, result: false},
 		{source: "create table users from", stmt: ast.QueryStmtCreateTable{Name: "users"}, result: false},
 		{source: "create table users (name text)", stmt: ast.QueryStmtCreateTable{Name: "users"}, result: false},
+		{source: "create table users ((name text)", stmt: ast.QueryStmtCreateTable{Name: "users"}, result: false},
+		{source: "create table users (name text))", stmt: ast.QueryStmtCreateTable{Name: "users"}, result: false},
 		{source: "create table users (name text);", stmt: ast.QueryStmtCreateTable{Name: "users"}, result: true},
 		{source: "create table users (name text)", stmt: ast.QueryStmtCreateTable{Name: "users"}, result: false},
 		{source: "create table cities (a text, b text);", stmt: ast.QueryStmtCreateTable{Name: "users"}, result: false},
+		{source: "create table cities2 (a text, b int);", stmt: ast.QueryStmtCreateTable{Name: "users"}, result: false},
+		{source: "create table users (name text, age int);", stmt: ast.QueryStmtCreateTable{Name: "users"}, result: true},
+		{source: "create table users (name text, age int,);", stmt: ast.QueryStmtCreateTable{Name: "users"}, result: true},
 	}
 
 	for _, tt := range tokensTests {
