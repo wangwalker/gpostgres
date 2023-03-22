@@ -13,6 +13,25 @@ To achieve this goal, we can split it into several steps below.
 - [x] Create table with `TEXT` and `INT` column types
 - [x] Return tables scheme when run`\d` or `\d table`
 
+```bash
+postgres# \h
+help
+postgres# create table users (name text, age int);
+create table: users OK!
+postgres# \d
+List of relations
+users
+postgres# \d users
+Column     | Type                |
+---------- + --------------------|
+name       | Text                |
+age        | Int                 |
+
+postgres# create table users (nate text);
+Error: invalid query create table users (nate text);, error: table already existed
+postgres# \q  
+quit
+```
 ### Section 2
 
 In this section, our goal is that can run `INSERT`, `SELETE`, `UPDATE` and `DELETE` statements like `CREATE`. And in this stage, all our data is in memory.

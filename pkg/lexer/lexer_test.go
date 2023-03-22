@@ -9,16 +9,16 @@ import (
 func TestCreateTableFailed(t *testing.T) {
 	tokensTests := []struct {
 		source string
-		stmt   ast.QueryStmtCreateTable
 	}{
-		{source: "create table users", stmt: ast.QueryStmtCreateTable{Name: "users"}},
-		{source: "create table users from", stmt: ast.QueryStmtCreateTable{Name: "users"}},
-		{source: "create table users ((name text)", stmt: ast.QueryStmtCreateTable{Name: "users"}},
-		{source: "create table users (name text))", stmt: ast.QueryStmtCreateTable{Name: "users"}},
-		{source: "create table users ((name text))", stmt: ast.QueryStmtCreateTable{Name: "users"}},
-		{source: "create table users1 user2 (name text)", stmt: ast.QueryStmtCreateTable{Name: "users"}},
-		{source: "create table users2 (name text, text, age int);", stmt: ast.QueryStmtCreateTable{Name: "users2"}},
-		{source: "create table users2 (name text, age int, gender);", stmt: ast.QueryStmtCreateTable{Name: "users2"}},
+		{source: "create table users"},
+		{source: "create table users from"},
+		{source: "create table users ((name text)"},
+		{source: "create table users (name text))"},
+		{source: "create table users ((name text))"},
+		{source: "create table users (text name);"},
+		{source: "create table users1 user2 (name text)"},
+		{source: "create table users2 (name text, text, age int);"},
+		{source: "create table users2 (name text, age int, gender);"},
 	}
 
 	for i, tt := range tokensTests {
@@ -35,17 +35,23 @@ func TestCreateTableSuccessfully(t *testing.T) {
 		stmt    ast.QueryStmtCreateTable
 		columns int
 	}{
-		{source: "create table users (name text);", stmt: ast.QueryStmtCreateTable{Name: "users"}, columns: 1},
+		{source: "create table users1 (name text)", stmt: ast.QueryStmtCreateTable{Name: "users1"}, columns: 1},
+		{source: "create table users2 (name text);", stmt: ast.QueryStmtCreateTable{Name: "users2"}, columns: 1},
+		{source: "create table users3 ( name text );", stmt: ast.QueryStmtCreateTable{Name: "users3"}, columns: 1},
 		{source: "create table cities (a text, b text);", stmt: ast.QueryStmtCreateTable{Name: "cities"}, columns: 2},
 		{source: "create table cities2 (a text, b int, c text);", stmt: ast.QueryStmtCreateTable{Name: "cities2"}, columns: 3},
 	}
 
 	for i, tt := range tokensTests {
-		table, err := Lex(tt.source)
-		nameEqual := table.Name == tt.stmt.Name
-		columnsEqual := len(table.Columns) == tt.columns
-		if !nameEqual || err != nil || !columnsEqual {
-			t.Errorf("TestLexCreateTable: source index %d should create table successfully, but is not null or name is not equal", i)
+		stmt, err := Lex(tt.source)
+		if err != nil {
+			t.Errorf("TestLexCreateTable: source index %d should create table successfully, but err is not null: %v", i, err)
+		}
+		if tt.stmt.Name != stmt.Name {
+			t.Errorf("TestLexCreateTable: source index %d should create table successfully, but name is not equal", i)
+		}
+		if tt.columns != len(stmt.Columns) {
+			t.Errorf("TestLexCreateTable: source index %d should create table successfully, but get wrong columns", i)
 		}
 	}
 }

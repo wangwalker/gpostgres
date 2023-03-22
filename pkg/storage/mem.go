@@ -13,12 +13,12 @@ var (
 
 var tables = make(map[string]MemoTable)
 
-func CreateTable(stmt ast.QueryStmtCreateTable) error {
+func CreateTable(stmt *ast.QueryStmtCreateTable) error {
 	tableName := stmt.Name
 	if _, ok := tables[tableName]; ok {
 		return ErrTableExisted
 	}
-	table := NewTable(stmt)
+	table := NewTable(*stmt)
 	tables[tableName] = *table
 	return nil
 }

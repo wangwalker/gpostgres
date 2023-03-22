@@ -23,9 +23,7 @@ REPL:
 			fmt.Print("postgres> ")
 		}
 
-		// Scans a line from Stdin(Console)
 		scanner.Scan()
-		// Holds the string that scanned
 		query := strings.ToLower(scanner.Text())
 		if lastInput != "" {
 			query = lastInput + query
@@ -37,35 +35,35 @@ REPL:
 			commandType, table := parser.ParseCommand(query)
 			switch commandType {
 			case parser.QuitCommand:
-				fmt.Println("quit")
+				showCommand(commandType, "")
 				break REPL
-			case parser.HelpCommand:
-				fmt.Println("help")
 			case parser.SchemeCommand:
-				scheme, err := storage.ShowTableSchemes(table)
-				if err != nil {
-					fmt.Println(scheme)
-					continue REPL
-				}
-				fmt.Println(scheme)
-			case parser.UnknownCommand:
-				fmt.Printf("invalid command: [%s]\n", query)
+				scheme, _ := storage.ShowTableSchemes(table)
+				showCommand(commandType, scheme)
+			case parser.HelpCommand, parser.UnknownCommand:
+				showCommand(commandType, "")
 			}
 		case parser.QueryTypeNormal:
-			createStmt, err := lexer.Lex(query)
+			_, err := lexer.Lex(query)
 			if err != nil {
 				fmt.Printf("Error: invalid query %s, error: %s\n", query, err)
-				continue REPL
 			}
-			err = storage.CreateTable(createStmt)
-			if err != nil {
-				fmt.Printf("Error: invalid query %s, error: %s\n", query, err)
-				continue REPL
-			}
-			fmt.Printf("Create Table: %s ok!\n", createStmt.Name)
 		case parser.QueryTypeUnkown:
 			// When an unexpected \n or \r is coming, holds it for next loop
 			lastInput = query + " "
 		}
+	}
+}
+
+func showCommand(c parser.CommandType, info string) {
+	switch c {
+	case parser.HelpCommand:
+		fmt.Println("help")
+	case parser.QuitCommand:
+		fmt.Println("quit")
+	case parser.SchemeCommand:
+		fmt.Println(info)
+	case parser.UnknownCommand:
+		fmt.Printf("invalid query: %s\n", info)
 	}
 }
