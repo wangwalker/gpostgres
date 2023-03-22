@@ -12,6 +12,10 @@ func TestPrepare(t *testing.T) {
 		{"\\quit", QueryTypeCommand},
 		{"\\h", QueryTypeCommand},
 		{"\\help", QueryTypeCommand},
+		{"\\d", QueryTypeCommand},
+		{"\\d table", QueryTypeCommand},
+		{"dd", QueryTypeUnkown},
+
 		{"create table users", QueryTypeUnkown},
 		{"create table users (name text)", QueryTypeUnkown},
 		{"create table users (name text);", QueryTypeNormal},
@@ -33,13 +37,20 @@ func TestParseCommand(t *testing.T) {
 	}{
 		{"", UnknownCommand},
 		{"q", QuitCommand},
+		{"\\q", QuitCommand},
 		{"quit", QuitCommand},
+		{"\\quit", QuitCommand},
 		{"h", HelpCommand},
 		{"help", HelpCommand},
+		{"\\help", HelpCommand},
+		{"\\d", SchemeCommand},
+		{"d", SchemeCommand},
+		{"\\d table", SchemeCommand},
+		{"\\d table name", SchemeCommand},
 	}
 
 	for _, tt := range cmdTests {
-		cmdTpe := ParseCommand(tt.cmd)
+		cmdTpe, _ := ParseCommand(tt.cmd)
 		if cmdTpe != tt.cmdType {
 			t.Errorf("input string %s should be command %v, but got result %v", tt.cmd, tt.cmdType, cmdTpe)
 		}

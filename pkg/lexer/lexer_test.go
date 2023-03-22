@@ -6,30 +6,46 @@ import (
 	"github.com/wangwalker/gpostgres/pkg/ast"
 )
 
-func TestLexCreateTable(t *testing.T) {
+func TestCreateTableFailed(t *testing.T) {
 	tokensTests := []struct {
 		source string
 		stmt   ast.QueryStmtCreateTable
-		result bool
 	}{
-		{source: "create table users", stmt: ast.QueryStmtCreateTable{Name: "user"}, result: false},
-		{source: "create table users from", stmt: ast.QueryStmtCreateTable{Name: "users"}, result: false},
-		{source: "create table users (name text)", stmt: ast.QueryStmtCreateTable{Name: "users"}, result: false},
-		{source: "create table users ((name text)", stmt: ast.QueryStmtCreateTable{Name: "users"}, result: false},
-		{source: "create table users (name text))", stmt: ast.QueryStmtCreateTable{Name: "users"}, result: false},
-		{source: "create table users (name text);", stmt: ast.QueryStmtCreateTable{Name: "users"}, result: true},
-		{source: "create table users (name text)", stmt: ast.QueryStmtCreateTable{Name: "users"}, result: false},
-		{source: "create table cities (a text, b text);", stmt: ast.QueryStmtCreateTable{Name: "users"}, result: false},
-		{source: "create table cities2 (a text, b int);", stmt: ast.QueryStmtCreateTable{Name: "users"}, result: false},
-		{source: "create table users (name text, age int);", stmt: ast.QueryStmtCreateTable{Name: "users"}, result: true},
-		{source: "create table users (name text, age int,);", stmt: ast.QueryStmtCreateTable{Name: "users"}, result: true},
+		{source: "create table users", stmt: ast.QueryStmtCreateTable{Name: "users"}},
+		{source: "create table users from", stmt: ast.QueryStmtCreateTable{Name: "users"}},
+		{source: "create table users ((name text)", stmt: ast.QueryStmtCreateTable{Name: "users"}},
+		{source: "create table users (name text))", stmt: ast.QueryStmtCreateTable{Name: "users"}},
+		{source: "create table users ((name text))", stmt: ast.QueryStmtCreateTable{Name: "users"}},
+		{source: "create table users1 user2 (name text)", stmt: ast.QueryStmtCreateTable{Name: "users"}},
+		{source: "create table users2 (name text, text, age int);", stmt: ast.QueryStmtCreateTable{Name: "users2"}},
+		{source: "create table users2 (name text, age int, gender);", stmt: ast.QueryStmtCreateTable{Name: "users2"}},
 	}
 
-	for _, tt := range tokensTests {
+	for i, tt := range tokensTests {
+		_, err := Lex(tt.source)
+		if err == nil {
+			t.Errorf("TestLexCreateTable: source index %d should create table failed, but err is null", i)
+		}
+	}
+}
+
+func TestCreateTableSuccessfully(t *testing.T) {
+	tokensTests := []struct {
+		source  string
+		stmt    ast.QueryStmtCreateTable
+		columns int
+	}{
+		{source: "create table users (name text);", stmt: ast.QueryStmtCreateTable{Name: "users"}, columns: 1},
+		{source: "create table cities (a text, b text);", stmt: ast.QueryStmtCreateTable{Name: "cities"}, columns: 2},
+		{source: "create table cities2 (a text, b int, c text);", stmt: ast.QueryStmtCreateTable{Name: "cities2"}, columns: 3},
+	}
+
+	for i, tt := range tokensTests {
 		table, err := Lex(tt.source)
-		if err != nil && tt.result {
-			t.Errorf("source %s after Lex() should get table name %s, but got %s",
-				tt.source, tt.stmt.Name, table.Name)
+		nameEqual := table.Name == tt.stmt.Name
+		columnsEqual := len(table.Columns) == tt.columns
+		if !nameEqual || err != nil || !columnsEqual {
+			t.Errorf("TestLexCreateTable: source index %d should create table successfully, but is not null or name is not equal", i)
 		}
 	}
 }

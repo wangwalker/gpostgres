@@ -16,6 +16,7 @@ func main() {
 	scanner := bufio.NewScanner(os.Stdin)
 REPL:
 	for {
+		lastInput = strings.TrimSpace(lastInput)
 		if lastInput == "" {
 			fmt.Print("postgres# ")
 		} else {
@@ -33,12 +34,20 @@ REPL:
 
 		switch parser.Prepare(query) {
 		case parser.QueryTypeCommand:
-			switch parser.ParseCommand(query) {
+			commandType, table := parser.ParseCommand(query)
+			switch commandType {
 			case parser.QuitCommand:
 				fmt.Println("quit")
 				break REPL
 			case parser.HelpCommand:
 				fmt.Println("help")
+			case parser.SchemeCommand:
+				scheme, err := storage.ShowTableSchemes(table)
+				if err != nil {
+					fmt.Println(scheme)
+					continue REPL
+				}
+				fmt.Println(scheme)
 			case parser.UnknownCommand:
 				fmt.Printf("invalid command: [%s]\n", query)
 			}

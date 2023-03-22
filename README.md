@@ -11,7 +11,7 @@ To achieve this goal, we can split it into several steps below.
 - [x] A simple REPL
 - [x] Create table without columns
 - [x] Create table with `TEXT` and `INT` column types
-- [ ] Return tables scheme when run`\d` or `\d table`
+- [x] Return tables scheme when run`\d` or `\d table`
 
 ### Section 2
 

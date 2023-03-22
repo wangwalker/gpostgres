@@ -29,18 +29,17 @@ type Token struct {
 }
 
 var (
-	QuerySyntaxBracketIncompleteError = errors.New("missing ( or )")
-	QuerySyntaxInvalidError           = errors.New("syntax is wrong")
-	EmptyCreateTableStmt              = ast.QueryStmtCreateTable{}
+	ErrQuerySyntaxBracketIncomplete = errors.New("missing ( or )")
+	ErrQuerySyntaxInvalid           = errors.New("syntax is wrong")
+	EmptyCreateTableStmt            = ast.QueryStmtCreateTable{}
 )
 
 // Create Table users ( name Text age Text );
 func tokenize(source string) ([]Token, error) {
 	stokens := strings.Fields(clean(source))
 	tokens := make([]Token, 0, len(stokens))
+	brackets := make([]string, 0)
 	isCreateQuery := false
-	hasLeftBracket := false
-	hasRightBracket := false
 	for i, t := range stokens {
 		token := Token{t, 0}
 		if isCreateQuery && i == 2 {
@@ -57,10 +56,14 @@ func tokenize(source string) ([]Token, error) {
 			token.Kind = TokenKindTable
 		case "(":
 			token.Kind = TokenKindLeftBracket
-			hasLeftBracket = true
+			brackets = append(brackets, t)
 		case ")":
 			token.Kind = TokenKindRightBracket
-			hasRightBracket = true
+			count := len(brackets)
+			if count != 1 {
+				return nil, ErrQuerySyntaxBracketIncomplete
+			}
+			brackets = brackets[:count-1]
 		case "text":
 			token.Kind = TokenKindColumnKindText
 		case "int":
@@ -72,9 +75,10 @@ func tokenize(source string) ([]Token, error) {
 		}
 		tokens = append(tokens, token)
 	}
-	if !hasLeftBracket || !hasRightBracket {
-		return nil, QuerySyntaxBracketIncompleteError
+	if len(brackets) != 0 {
+		return nil, ErrQuerySyntaxBracketIncomplete
 	}
+
 	return tokens, nil
 }
 
@@ -84,18 +88,21 @@ func Lex(source string) (ast.QueryStmtCreateTable, error) {
 		return EmptyCreateTableStmt, err
 	}
 	if len(tokens) < 1 {
-		return EmptyCreateTableStmt, QuerySyntaxInvalidError
+		return EmptyCreateTableStmt, ErrQuerySyntaxInvalid
 	}
 
 	switch tokens[0].Kind {
 	case TokenKindKeywordCreate:
-		if len(tokens) < 3 {
-			return EmptyCreateTableStmt, QuerySyntaxInvalidError
+		if len(tokens) <= 3 {
+			return EmptyCreateTableStmt, ErrQuerySyntaxInvalid
 		}
 		createStmt, err := composeCreateStmt(tokens)
-		return createStmt, err
+		if err != nil {
+			return EmptyCreateTableStmt, err
+		}
+		return createStmt, nil
 	}
-	return EmptyCreateTableStmt, QuerySyntaxInvalidError
+	return EmptyCreateTableStmt, ErrQuerySyntaxInvalid
 }
 
 func clean(souce string) string {
@@ -108,24 +115,27 @@ func clean(souce string) string {
 
 func composeCreateStmt(tokens []Token) (ast.QueryStmtCreateTable, error) {
 	createStmt := ast.QueryStmtCreateTable{}
-	columnCount := 0
 	columns := make([]ast.Column, 0)
-	var column ast.Column
+	var c ast.Column
+	names, kinds := 0, 0
 	for _, t := range tokens {
 		switch t.Kind {
 		case TokenKindTableName:
 			createStmt.Name = t.Value
 		case TokenKindColumnKindText, TokenKindColumnKindInt:
-			column.Kind = ast.ColumnKind(mapColumnKind(t.Kind))
-			columns = append(columns, column)
+			if c.Kind != 0 {
+				return EmptyCreateTableStmt, ErrQuerySyntaxInvalid
+			}
+			c.Kind = ast.ColumnKind(mapColumnKind(t.Kind))
+			columns = append(columns, c)
+			kinds += 1
 		case TokenKindColumnName:
-			column = ast.Column{Name: ast.ColumnName(t.Value)}
-			columnCount += 1
+			c = ast.Column{Name: ast.ColumnName(t.Value)}
+			names += 1
 		}
 	}
-	// only have both column value and kind like `name Text`, the column is valid
-	if column.Kind == 0 || column.Name == "" {
-		return EmptyCreateTableStmt, QuerySyntaxInvalidError
+	if names != kinds {
+		return EmptyCreateTableStmt, ErrQuerySyntaxInvalid
 	}
 	createStmt.Columns = columns
 	return createStmt, nil

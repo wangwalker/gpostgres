@@ -11,6 +11,16 @@ const (
 type ColumnName string
 type ColumnKind uint8
 
+func (c ColumnKind) String() string {
+	switch c {
+	case ColumnKindInt:
+		return "Int"
+	case ColumnKindText:
+		return "Text"
+	}
+	return ""
+}
+
 type Column struct {
 	Name ColumnName
 	Kind ColumnKind
