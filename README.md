@@ -36,6 +36,12 @@ quit
 
 In this section, our goal is that can run `INSERT`, `SELETE`, `UPDATE` and `DELETE` statements like `CREATE`. And in this stage, all our data is in memory.
 
+To achieve this goal, we can split it into several steps below.
+
+- [ ] Support `INSERT` sql
+- [ ] Support `SELECT` sql
+- [ ] Support `UPDATE` and `DELETE` sqls
+
 ### Section 3
 
 In this section, we will support data persistence in local file system in some structures.
