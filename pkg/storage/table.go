@@ -11,7 +11,7 @@ const (
 	tableRowDefaultCount uint8 = 100
 )
 
-type Row []string
+type Row []ast.ColumnValue
 
 type MemoTable struct {
 	Name    string

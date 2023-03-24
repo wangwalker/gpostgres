@@ -12,16 +12,20 @@ type TokenKind uint
 
 const (
 	TokenKindKeywordCreate TokenKind = iota
+	TokenKindKeywordInsert
 	TokenKindKeywordSelect
 	TokenKindKeywordAlter
 	TokenKindKeywordDrop
 	TokenKindTable
 	TokenKindTableName
+	TokenKindInto
+	TokenKindValues
 	TokenKindLeftBracket
 	TokenKindRightBracket
 	TokenKindColumnKindText
 	TokenKindColumnKindInt
 	TokenKindColumnName
+	TokenKindColumnValue
 )
 
 type Token struct {
@@ -39,6 +43,8 @@ func tokenize(source string) ([]Token, error) {
 	switch stokens[0] {
 	case "create":
 		return tokenizeCreate(stokens)
+	case "insert":
+		return tokenizeInsert(stokens)
 	}
 	return nil, nil
 }
@@ -64,6 +70,17 @@ func Lex(source string) (interface{}, error) {
 		}
 		fmt.Printf("create table: %s OK!\n", createStmt.Name)
 		return createStmt, nil
+	case TokenKindKeywordInsert:
+		stmt, err := composeInsertStmt(tokens)
+		if err != nil {
+			return nil, err
+		}
+		n, err := storage.Insert(stmt)
+		if err != nil {
+			return nil, err
+		}
+		fmt.Printf("insert %d rows ok!\n", n)
+		return stmt, nil
 	}
 	return nil, nil
 }

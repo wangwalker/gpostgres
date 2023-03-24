@@ -46,7 +46,7 @@ REPL:
 		case parser.QueryTypeNormal:
 			_, err := lexer.Lex(query)
 			if err != nil {
-				fmt.Printf("Error: invalid query %s, error: %s\n", query, err)
+				fmt.Printf("Error: %s\n", err)
 			}
 		case parser.QueryTypeUnkown:
 			// When an unexpected \n or \r is coming, holds it for next loop
