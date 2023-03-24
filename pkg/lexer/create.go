@@ -4,7 +4,6 @@ import "github.com/wangwalker/gpostgres/pkg/ast"
 
 func tokenizeCreate(stokens []string) ([]Token, error) {
 	tokens := make([]Token, 0, len(stokens))
-	brackets := make([]string, 0)
 	for i, t := range stokens {
 		token := Token{t, 0}
 		if i == 2 {
@@ -15,46 +14,26 @@ func tokenizeCreate(stokens []string) ([]Token, error) {
 		}
 		switch t {
 		case "create":
-			if i != 0 {
-				return nil, ErrQuerySyntaxInvalid
-			}
 			token.Kind = TokenKindKeywordCreate
 		case "table":
-			if i != 1 {
-				return nil, ErrQuerySyntaxInvalid
-			}
 			token.Kind = TokenKindTable
 		case "(":
 			token.Kind = TokenKindLeftBracket
-			brackets = append(brackets, t)
 		case ")":
-			if len(brackets) != 1 {
-				return nil, ErrQuerySyntaxInvalid
-			}
-			brackets = brackets[:0]
 			token.Kind = TokenKindRightBracket
 		case "text":
-			if len(brackets) < 1 {
-				return nil, ErrQuerySyntaxInvalid
-			}
 			token.Kind = TokenKindColumnKindText
 		case "int":
-			if len(brackets) < 1 {
-				return nil, ErrQuerySyntaxInvalid
-			}
 			token.Kind = TokenKindColumnKindInt
 		default:
-			if len(brackets) < 1 {
-				return nil, ErrQuerySyntaxInvalid
-			}
 			// otherwise, token is the column value
 			token.Kind = TokenKindColumnName
 			token.Value = t
 		}
 		tokens = append(tokens, token)
 	}
-	if len(brackets) != 0 {
-		return nil, ErrQuerySyntaxBracketIncomplete
+	if !checked(makeCreateCheckers(tokens)...) {
+		return nil, ErrQuerySyntaxInvalid
 	}
 	return tokens, nil
 }
@@ -108,4 +87,31 @@ func mapColumnKind(k TokenKind) ast.ColumnKind {
 		return ast.ColumnKindInt
 	}
 	return ast.ColumnKindUnknown
+}
+
+func makeCreateCheckers(tokens []Token) []Checker {
+	return []Checker{
+		LengthConstraint{
+			tokens: tokens,
+			pairs: []CmpValuePair{
+				{cmp: CmpKindGte, value: 7},
+			}},
+		PosKindConstraint{
+			tokens: tokens,
+			pairs: []PosKindPair{
+				{pos: 0, kind: TokenKindKeywordCreate},
+				{pos: 1, kind: TokenKindTable},
+				{pos: 2, kind: TokenKindTableName},
+			},
+		},
+		KccConstraint{
+			tokens: tokens,
+			paris: []KindCountCmpPair{
+				{TokenKindKeywordCreate, 1, CmpKindEq},
+				{TokenKindTableName, 1, CmpKindEq},
+				{TokenKindLeftBracket, 1, CmpKindEq},
+				{TokenKindRightBracket, 1, CmpKindEq},
+			},
+		},
+	}
 }

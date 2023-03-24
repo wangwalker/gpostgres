@@ -82,7 +82,7 @@ func Lex(source string) (interface{}, error) {
 		fmt.Printf("insert %d rows ok!\n", n)
 		return stmt, nil
 	}
-	return nil, nil
+	return nil, ErrQuerySyntaxInvalid
 }
 
 func clean(souce string) string {

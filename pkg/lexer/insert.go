@@ -70,7 +70,9 @@ func composeInsertStmt(tokens []Token) (*ast.QueryStmtInsertValues, error) {
 			values = values[:0]
 		case TokenKindRightBracket:
 			row := values[:]
-			rows = append(rows, row)
+			if len(row) > 0 {
+				rows = append(rows, row)
+			}
 		}
 	}
 
