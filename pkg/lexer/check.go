@@ -111,6 +111,64 @@ func (kcc KccConstraint) Check() bool {
 	return true
 }
 
+type TokenKindOrder uint
+
+const (
+	TokenOrderAscend TokenKindOrder = iota
+	TokenOrderDescend
+)
+
+// Check if the given tokens has the expected order with specific kinds
+// If steps is 0, just check order, don't consider the padding between them
+type KindOrderPair struct {
+	order TokenKindOrder
+	steps int
+	kinds []TokenKind // just needs two kinds
+}
+
+type OrderConstraints struct {
+	tokens []Token
+	pairs  []KindOrderPair
+}
+
+func (oc OrderConstraints) Check() bool {
+	for _, pair := range oc.pairs {
+		kind1, kind2 := pair.kinds[0], pair.kinds[1]
+		idx1, idx2 := 0, 0
+		for i, t := range oc.tokens {
+			if t.Kind == kind1 {
+				idx1 = i
+			}
+			if t.Kind == kind2 {
+				idx2 = i
+			}
+		}
+		switch pair.order {
+		case TokenOrderAscend:
+			if pair.steps == 0 {
+				if idx1 > idx2 {
+					return false
+				}
+				continue
+			}
+			if (idx2 - idx1) != pair.steps {
+				return false
+			}
+		case TokenOrderDescend:
+			if pair.steps == 0 {
+				if idx1 < idx2 {
+					return false
+				}
+				continue
+			}
+			if (idx1 - idx2) != pair.steps {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func checked(cs ...Checker) bool {
 	for _, c := range cs {
 		if !c.Check() {

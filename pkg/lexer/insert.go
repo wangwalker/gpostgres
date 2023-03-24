@@ -107,5 +107,13 @@ func makeInsertCheckers(tokens []Token) []Checker {
 				{TokenKindRightBracket, 1, CmpKindGte},
 			},
 		},
+		OrderConstraints{
+			tokens: tokens,
+			pairs: []KindOrderPair{
+				{TokenOrderAscend, 1, []TokenKind{TokenKindInto, TokenKindTableName}},
+				{TokenOrderAscend, 0, []TokenKind{TokenKindTableName, TokenKindLeftBracket}},
+				{TokenOrderAscend, 0, []TokenKind{TokenKindLeftBracket, TokenKindRightBracket}},
+			},
+		},
 	}
 }
