@@ -54,6 +54,7 @@ func tokenizeInsert(stokens []string) ([]Token, error) {
 
 func composeInsertStmt(tokens []Token) (*ast.QueryStmtInsertValues, error) {
 	stmt := ast.QueryStmtInsertValues{}
+	rows := make([]ast.Row, 0)
 	names, values := make([]ast.ColumnName, 0), make([]ast.ColumnValue, 0)
 	for _, t := range tokens {
 		switch t.Kind {
@@ -65,6 +66,11 @@ func composeInsertStmt(tokens []Token) (*ast.QueryStmtInsertValues, error) {
 		case TokenKindColumnValue:
 			value := t.Value
 			values = append(values, ast.ColumnValue(value))
+		case TokenKindLeftBracket:
+			values = values[:0]
+		case TokenKindRightBracket:
+			row := values[:]
+			rows = append(rows, row)
 		}
 	}
 
@@ -72,7 +78,7 @@ func composeInsertStmt(tokens []Token) (*ast.QueryStmtInsertValues, error) {
 		stmt.ContainsAllColumns = true
 	}
 	stmt.ColumnNames = names
-	stmt.ColumnValues = values
+	stmt.Rows = rows
 	return &stmt, nil
 }
 

@@ -11,6 +11,7 @@ const (
 type ColumnName string
 type ColumnKind uint8
 type ColumnValue string
+type Row []ColumnValue
 
 func (c ColumnKind) String() string {
 	switch c {
@@ -41,6 +42,6 @@ type QueryStmtCreateTable struct {
 type QueryStmtInsertValues struct {
 	TableName          string
 	ColumnNames        []ColumnName
-	ColumnValues       []ColumnValue
+	Rows               []Row
 	ContainsAllColumns bool
 }

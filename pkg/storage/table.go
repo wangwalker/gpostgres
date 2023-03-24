@@ -11,7 +11,9 @@ const (
 	tableRowDefaultCount uint8 = 100
 )
 
-type Row []ast.ColumnValue
+type Field string
+
+type Row []Field
 
 type MemoTable struct {
 	Name    string
@@ -38,7 +40,7 @@ func (mt MemoTable) String() string {
 }
 
 func NewTable(stmt ast.QueryStmtCreateTable) *MemoTable {
-	rows := make([]Row, tableRowDefaultCount)
+	rows := make([]Row, 0, tableRowDefaultCount)
 	return &MemoTable{
 		Name:    stmt.Name,
 		Columns: stmt.Columns,

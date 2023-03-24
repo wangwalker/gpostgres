@@ -9,7 +9,7 @@ import (
 var (
 	ErrTableExisted     = errors.New("table already existed")
 	ErrTableNotExisted  = errors.New("table not existed")
-	ErrValuesImcomplete = errors.New("inserted values isn't complete")
+	ErrValuesIncomplete = errors.New("inserted values isn't complete")
 )
 
 var tables = make(map[string]MemoTable)
@@ -29,21 +29,24 @@ func Insert(stmt *ast.QueryStmtInsertValues) (int, error) {
 	if !ok {
 		return 0, ErrTableNotExisted
 	}
-	row := make([]ast.ColumnValue, 0, len(stmt.ColumnValues))
+	columns := len(stmt.ColumnNames)
 	if stmt.ContainsAllColumns {
-		if len(table.Columns) != len(stmt.ColumnValues) {
-			return 0, ErrValuesImcomplete
-		}
-		// TODO: check if column value and kind matches
-		for _, v := range stmt.ColumnValues {
-			row = append(row, ast.ColumnValue(v))
-		}
-	} else {
-		// TODO: Support default value for column for partial columns insertion
-		for _, v := range stmt.ColumnValues {
-			row = append(row, ast.ColumnValue(v))
-		}
+		columns = len(table.Columns)
 	}
-	table.Rows = append(table.Rows, row)
-	return 1, nil
+	// TODO: support default value for column when inserts partial columns
+	// TODO: check if column value and kind matches
+	rows := make([]Row, 0, len(stmt.Rows))
+	for _, r := range stmt.Rows {
+		row := make([]Field, 0, len(r))
+		for _, v := range r {
+			row = append(row, Field(v))
+		}
+		if len(row) != columns {
+			return 0, ErrValuesIncomplete
+		}
+		rows = append(rows, row)
+	}
+
+	table.Rows = append(table.Rows, rows...)
+	return len(rows), nil
 }

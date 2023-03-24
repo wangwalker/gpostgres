@@ -38,7 +38,7 @@ In this section, our goal is that can run `INSERT`, `SELETE`, `UPDATE` and `DELE
 
 To achieve this goal, we can split it into several steps below.
 
-- [ ] Support `INSERT` sql
+- [x] Support `INSERT` sql
 - [ ] Support `SELECT` sql
 - [ ] Support `UPDATE` and `DELETE` sqls
 
