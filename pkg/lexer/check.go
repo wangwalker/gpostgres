@@ -1,21 +1,13 @@
 package lexer
 
-type CmpKind uint
-
-const (
-	CmpKindEq  CmpKind = iota // ==
-	CmpKindGt                 // >
-	CmpKindGte                // >=
-	CmpKindLt                 // <
-	CmpKindLte                // <=
-)
+import "github.com/wangwalker/gpostgres/pkg/ast"
 
 type Checker interface {
 	Check() bool
 }
 
 type CmpValuePair struct {
-	cmp   CmpKind
+	cmp   ast.CmpKind
 	value int
 }
 
@@ -30,15 +22,15 @@ func (lc LengthConstraint) Check() bool {
 	ok := true
 	for _, pair := range lc.pairs {
 		switch pair.cmp {
-		case CmpKindEq:
+		case ast.CmpKindEq:
 			ok = (l == pair.value) && ok
-		case CmpKindGt:
+		case ast.CmpKindGt:
 			ok = (l > pair.value) && ok
-		case CmpKindGte:
+		case ast.CmpKindGte:
 			ok = (l >= pair.value) && ok
-		case CmpKindLt:
+		case ast.CmpKindLt:
 			ok = (l < pair.value) && ok
-		case CmpKindLte:
+		case ast.CmpKindLte:
 			ok = (l <= pair.value) && ok
 		}
 		if !ok {
@@ -73,7 +65,7 @@ func (pk PosKindConstraint) Check() bool {
 type KindCountCmpPair struct {
 	kind  TokenKind
 	count int
-	cmp   CmpKind
+	cmp   ast.CmpKind
 }
 
 // The constraints about the number of tokens with one specific kind must satisfy conditions
@@ -92,15 +84,15 @@ func (kcc KccConstraint) Check() bool {
 		}
 		ok := true
 		switch pair.cmp {
-		case CmpKindEq:
+		case ast.CmpKindEq:
 			ok = (count == pair.count) && ok
-		case CmpKindGt:
+		case ast.CmpKindGt:
 			ok = (count > pair.count) && ok
-		case CmpKindGte:
+		case ast.CmpKindGte:
 			ok = (count >= pair.count) && ok
-		case CmpKindLt:
+		case ast.CmpKindLt:
 			ok = (count < pair.count) && ok
-		case CmpKindLte:
+		case ast.CmpKindLte:
 			ok = (count <= pair.count) && ok
 		}
 		if !ok {

@@ -4,10 +4,10 @@ import (
 	"github.com/wangwalker/gpostgres/pkg/ast"
 )
 
-func tokenizeInsert(stokens []string) ([]Token, error) {
-	tokens := make([]Token, 0, len(stokens))
+func tokenizeInsert(fields []string) ([]Token, error) {
+	tokens := make([]Token, 0, len(fields))
 	containsAllColumns, finishColumnNames := false, false
-	for i, t := range stokens {
+	for i, t := range fields {
 		token := Token{t, 0}
 		if i == 2 {
 			token.Kind = TokenKindTableName
@@ -67,7 +67,7 @@ func composeInsertStmt(tokens []Token) (*ast.QueryStmtInsertValues, error) {
 			value := t.Value
 			values = append(values, ast.ColumnValue(value))
 		case TokenKindLeftBracket:
-			values = values[:0]
+			values = make([]ast.ColumnValue, 0)
 		case TokenKindRightBracket:
 			row := values[:]
 			if len(row) > 0 {
@@ -89,7 +89,7 @@ func makeInsertCheckers(tokens []Token) []Checker {
 		LengthConstraint{
 			tokens: tokens,
 			pairs: []CmpValuePair{
-				{cmp: CmpKindGte, value: 6},
+				{cmp: ast.CmpKindGte, value: 6},
 			}},
 		PosKindConstraint{
 			tokens: tokens,
@@ -101,10 +101,10 @@ func makeInsertCheckers(tokens []Token) []Checker {
 		KccConstraint{
 			tokens: tokens,
 			paris: []KindCountCmpPair{
-				{TokenKindKeywordInsert, 1, CmpKindEq},
-				{TokenKindInto, 1, CmpKindEq},
-				{TokenKindLeftBracket, 1, CmpKindGte},
-				{TokenKindRightBracket, 1, CmpKindGte},
+				{TokenKindKeywordInsert, 1, ast.CmpKindEq},
+				{TokenKindInto, 1, ast.CmpKindEq},
+				{TokenKindLeftBracket, 1, ast.CmpKindGte},
+				{TokenKindRightBracket, 1, ast.CmpKindGte},
 			},
 		},
 		OrderConstraints{

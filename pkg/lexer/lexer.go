@@ -26,6 +26,17 @@ const (
 	TokenKindColumnKindInt
 	TokenKindColumnName
 	TokenKindColumnValue
+	TokenKindAsterisk
+	TokenKindFrom
+	TokenKindWhere
+	TokenKindCmpEq
+	TokenKindCmpNotEq
+	TokenKindCmpGt
+	TokenKindCmpGte
+	TokenKindCmpLt
+	TokenKindCmpLte
+	TokenKindCmpLeft
+	TokenKindCmpRight
 )
 
 type Token struct {
@@ -39,12 +50,14 @@ var (
 )
 
 func tokenize(source string) ([]Token, error) {
-	stokens := strings.Fields(clean(source))
-	switch stokens[0] {
+	fields := strings.Fields(clean(source))
+	switch fields[0] {
 	case "create":
-		return tokenizeCreate(stokens)
+		return tokenizeCreate(fields)
 	case "insert":
-		return tokenizeInsert(stokens)
+		return tokenizeInsert(fields)
+	case "select":
+		return tokenizeSelect(fields)
 	}
 	return nil, nil
 }
@@ -81,6 +94,17 @@ func Lex(source string) (interface{}, error) {
 		}
 		fmt.Printf("insert %d rows ok!\n", n)
 		return stmt, nil
+	case TokenKindKeywordSelect:
+		stmt, err := composeSelectStmt(tokens)
+		if err != nil {
+			return nil, err
+		}
+		rows, err := storage.Select(stmt)
+		if err != nil {
+			return nil, err
+		}
+		fmt.Printf("select %d rows ok!\n%v\n", len(rows), rows)
+		return rows, nil
 	}
 	return nil, ErrQuerySyntaxInvalid
 }
@@ -91,4 +115,13 @@ func clean(souce string) string {
 	s = strings.ReplaceAll(s, "(", " ( ")
 	s = strings.ReplaceAll(s, ")", " ) ")
 	return s
+}
+
+func containsKind(tokens []Token, kind TokenKind) bool {
+	for _, t := range tokens {
+		if t.Kind == kind {
+			return true
+		}
+	}
+	return false
 }

@@ -2,9 +2,9 @@ package lexer
 
 import "github.com/wangwalker/gpostgres/pkg/ast"
 
-func tokenizeCreate(stokens []string) ([]Token, error) {
-	tokens := make([]Token, 0, len(stokens))
-	for i, t := range stokens {
+func tokenizeCreate(fields []string) ([]Token, error) {
+	tokens := make([]Token, 0, len(fields))
+	for i, t := range fields {
 		token := Token{t, 0}
 		if i == 2 {
 			token.Kind = TokenKindTableName
@@ -39,18 +39,11 @@ func tokenizeCreate(stokens []string) ([]Token, error) {
 }
 
 func composeCreateStmt(tokens []Token) (*ast.QueryStmtCreateTable, error) {
-	// The shortest creation has 7 tokens like: CREATE TABLE users (name text)
-	if len(tokens) < 7 {
-		return nil, ErrQuerySyntaxInvalid
-	}
-
 	createStmt := ast.QueryStmtCreateTable{}
 	columns := make([]ast.Column, 0)
 	// make sure column name and kind is in right order
 	columnStack := make([]string, 0)
 	var c ast.Column
-	// keep track of the numbers of column names and column kinds, make sure they are equal
-	names, kinds := 0, 0
 	for _, t := range tokens {
 		switch t.Kind {
 		case TokenKindTableName:
@@ -65,15 +58,10 @@ func composeCreateStmt(tokens []Token) (*ast.QueryStmtCreateTable, error) {
 			c.Kind = ast.ColumnKind(mapColumnKind(t.Kind))
 			columns = append(columns, c)
 			columnStack = columnStack[:0]
-			kinds += 1
 		case TokenKindColumnName:
 			c = ast.Column{Name: ast.ColumnName(t.Value)}
 			columnStack = append(columnStack, t.Value)
-			names += 1
 		}
-	}
-	if names != kinds {
-		return nil, ErrQuerySyntaxInvalid
 	}
 	createStmt.Columns = columns
 	return &createStmt, nil
@@ -90,11 +78,17 @@ func mapColumnKind(k TokenKind) ast.ColumnKind {
 }
 
 func makeCreateCheckers(tokens []Token) []Checker {
+	kinds := 0 // the numbers of column kind tokens
+	for _, n := range tokens {
+		if n.Kind == TokenKindColumnKindInt || n.Kind == TokenKindColumnKindText {
+			kinds += 1
+		}
+	}
 	return []Checker{
 		LengthConstraint{
 			tokens: tokens,
 			pairs: []CmpValuePair{
-				{cmp: CmpKindGte, value: 7},
+				{cmp: ast.CmpKindGte, value: 7},
 			}},
 		PosKindConstraint{
 			tokens: tokens,
@@ -107,10 +101,11 @@ func makeCreateCheckers(tokens []Token) []Checker {
 		KccConstraint{
 			tokens: tokens,
 			paris: []KindCountCmpPair{
-				{TokenKindKeywordCreate, 1, CmpKindEq},
-				{TokenKindTableName, 1, CmpKindEq},
-				{TokenKindLeftBracket, 1, CmpKindEq},
-				{TokenKindRightBracket, 1, CmpKindEq},
+				{TokenKindKeywordCreate, 1, ast.CmpKindEq},
+				{TokenKindTableName, 1, ast.CmpKindEq},
+				{TokenKindColumnName, kinds, ast.CmpKindEq},
+				{TokenKindLeftBracket, 1, ast.CmpKindEq},
+				{TokenKindRightBracket, 1, ast.CmpKindEq},
 			},
 		},
 		OrderConstraints{

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/wangwalker/gpostgres/pkg/ast"
+	"github.com/wangwalker/gpostgres/pkg/storage"
 )
 
 func TestCreateTableFailed(t *testing.T) {
@@ -24,12 +25,12 @@ func TestCreateTableFailed(t *testing.T) {
 	for i, tt := range createTests {
 		_, err := Lex(tt.source)
 		if err == nil {
-			t.Errorf("TestCreateTableFailed: test %d should create table failed, but err is null", i)
+			t.Errorf("%s: test %d should create table failed, but err is null", t.Name(), i)
 		}
 	}
 }
 
-func TestCreateTableSuccessfully(t *testing.T) {
+func TestCreateTableSucceed(t *testing.T) {
 	createTests := []struct {
 		source  string
 		stmt    ast.QueryStmtCreateTable
@@ -45,22 +46,22 @@ func TestCreateTableSuccessfully(t *testing.T) {
 	for i, tt := range createTests {
 		stmt, err := Lex(tt.source)
 		if err != nil {
-			t.Errorf("TestCreateTableSuccessfully: test %d should create table successfully, but err is not null: %v", i, err)
+			t.Errorf("%s: test %d should create table ok, but err is not null: %v", t.Name(), i, err)
 		}
 		create, ok := stmt.(*ast.QueryStmtCreateTable)
 		if !ok {
-			t.Errorf("TestCreateTableSuccessfully: test %d should create table successfully, but return wrong type", i)
+			t.Errorf("%s: test %d should create table ok, but return wrong type", t.Name(), i)
 		}
 		if tt.stmt.Name != create.Name {
-			t.Errorf("TestCreateTableSuccessfully: test %d should create table successfully, but name is not equal", i)
+			t.Errorf("%s: test %d should create table ok, but name is not equal", t.Name(), i)
 		}
 		if tt.columns != len(create.Columns) {
-			t.Errorf("TestCreateTableSuccessfully: test %d should create table successfully, but get wrong columns", i)
+			t.Errorf("%s: test %d should create table ok, but get wrong columns", t.Name(), i)
 		}
 	}
 }
 
-func TestInsertFailedWhenTableNotExisted(t *testing.T) {
+func TestInsertFailsWhenTableNotExist(t *testing.T) {
 	insertTests := []struct {
 		source string
 	}{
@@ -74,16 +75,16 @@ func TestInsertFailedWhenTableNotExisted(t *testing.T) {
 	for i, tt := range insertTests {
 		_, err := Lex(tt.source)
 		if err == nil {
-			t.Errorf("TestInsertFailedWhenTableNotExisted: test %d should fail, but err is null", i)
+			t.Errorf("%s: test %d should fail, but err is null", t.Name(), i)
 		}
 	}
 }
 
-func TestInsertFailledWhenSyntaxWrong(t *testing.T) {
+func TestInsertFaillsWhenSyntaxWrong(t *testing.T) {
 	// Create a table named users
 	_, err := Lex("create table u (name text, age int);")
 	if err != nil {
-		t.Errorf("TestInsertFailledWhenSyntaxWrong: should create table successfully, but err: %v", err)
+		t.Errorf("%s: should create table ok, but err: %v", t.Name(), err)
 	}
 
 	insertTests := []string{
@@ -101,16 +102,16 @@ func TestInsertFailledWhenSyntaxWrong(t *testing.T) {
 	for i, tt := range insertTests {
 		_, err := Lex(tt)
 		if err == nil {
-			t.Errorf("TestInsertFailledWhenSyntaxWrong: test %d should fail, but error is null", i)
+			t.Errorf("%s: test %d should fail, but error is null", t.Name(), i)
 		}
 	}
 }
 
-func TestInsertSuccessfully(t *testing.T) {
+func TestInsertSucceed(t *testing.T) {
 	// Create a table named users
 	_, err := Lex("create table users (name text, age int);")
 	if err != nil {
-		t.Errorf("TestInsertFailledWhenSyntaxWrong: should create table successfully, but err: %v", err)
+		t.Errorf("%s: should create table ok, but err: %v", t.Name(), err)
 	}
 
 	insertTests := []string{
@@ -122,7 +123,100 @@ func TestInsertSuccessfully(t *testing.T) {
 	for i, tt := range insertTests {
 		_, err := Lex(tt)
 		if err != nil {
-			t.Errorf("TestInsertSuccessfully: test %d should succeed, but error is not null: %v", i, err)
+			t.Errorf("%s: test %d should succeed, but error is not null: %v", t.Name(), i, err)
+		}
+	}
+}
+
+func TestSelectFailsWhenTableNotExist(t *testing.T) {
+	selectTests := []string{
+		"select from;",
+		"select * from;",
+		"select * from nonexistedtable;",
+		"select a, b from c;",
+		"select () from c",
+	}
+	for i, tt := range selectTests {
+		_, err := Lex(tt)
+		if err == nil {
+			t.Errorf("%s: test %d should fail, but err is null", t.Name(), i)
+		}
+	}
+}
+
+func TestSelectFailsWhenTableExistButWrongColumns(t *testing.T) {
+	// GIVEN
+	createAndInsert := []string{
+		"create table stu (name text, age int);",
+		"insert into stu values ('a', 11)",
+		"insert into stu (name, age) values ('a', 12)",
+		"insert into stu values ('a', 13), ('b', 12);",
+		"insert into stu (name, age) values ('a', 14), ('b', 12);",
+	}
+	for i, tt := range createAndInsert {
+		_, err := Lex(tt)
+		if err != nil {
+			t.Errorf("%s: given: test %d should ok, but err isn't null", t.Name(), i)
+		}
+	}
+
+	// WHEN
+	selectTests := []string{
+		"select (a) from stu where name == 'a';",
+		"select (a, b) from stu where name == 'a';",
+		"select a, b from stu where name == 'a';",
+		"select (a, b from stu where name == 'a';",
+		"select (a, b) from stu;",
+		"select (name, b) from stu where name == 'a';",
+		"select (name, age, c) from stu where name == 'a';",
+	}
+	// THEN
+	for i, tt := range selectTests {
+		_, err := Lex(tt)
+		if err == nil {
+			t.Errorf("%s: then: %d should fail, but err is null", t.Name(), i)
+		}
+	}
+}
+
+func TestSelectSucceed(t *testing.T) {
+	// GIVEN
+	createAndInsert := []string{
+		"create table stu2 (name text, age int);",
+		"insert into stu2 values ('a', 11)",
+		"insert into stu2 (name, age) values ('a', 12)",
+		"insert into stu2 values ('a', 13), ('b', 22);",
+		"insert into stu2 (name, age) values ('a', 14), ('b', 12);",
+	}
+	for i, tt := range createAndInsert {
+		_, err := Lex(tt)
+		if err != nil {
+			t.Errorf("%s: given: test %d should ok, but err isn't null", t.Name(), i)
+		}
+	}
+
+	// WHEN
+	selectTests := []struct {
+		source string
+		rows   int
+	}{
+		{"select * from stu2;", 6},
+		{"select (name) from stu2;", 6},
+		{"select (name, age) from stu2;", 6},
+		{"select * from stu2 where name == 'a';", 4},
+		{"select * from stu2 where name != 'a';", 2},
+		{"select (name) from stu2 where name == 'a';", 4},
+		{"select (name, age) from stu2 where name != 'a'", 2},
+	}
+	// THEN
+	for i, tt := range selectTests {
+		r, err := Lex(tt.source)
+		if err != nil {
+			t.Errorf("%s: then: test %d should ok, but err isn't null", t.Name(), i)
+		}
+		rows, ok := r.([]storage.Row)
+		if !ok || len(rows) != tt.rows {
+			t.Errorf("%s: then: test %d should get %d rows, but got %d ", t.Name(), i, tt.rows, len(rows))
 		}
 	}
 }

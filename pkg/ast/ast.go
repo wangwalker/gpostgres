@@ -45,3 +45,36 @@ type QueryStmtInsertValues struct {
 	Rows               []Row
 	ContainsAllColumns bool
 }
+
+type CmpKind uint
+
+const (
+	CmpKindEq CmpKind = iota // ==
+	CmpKindNotEq
+	CmpKindGt  // >
+	CmpKindGte // >=
+	CmpKindLt  // <
+	CmpKindLte // <=
+)
+
+// Now just support simple selection based on value comparation, like:
+// SELECT ... FROM fdt WHERE c1 >/>=/</<=/!= 5
+type WhereClause struct {
+	Column ColumnName
+	Value  string
+	Cmp    CmpKind
+}
+
+func (w WhereClause) IsEmpty() bool {
+	if w.Column == "" && w.Value == "" {
+		return true
+	}
+	return false
+}
+
+type QueryStmtSelectValues struct {
+	TableName          string
+	ColumnNames        []ColumnName
+	ContainsAllColumns bool
+	Where              WhereClause
+}

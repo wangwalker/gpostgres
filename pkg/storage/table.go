@@ -17,9 +17,17 @@ type Row []Field
 
 type MemoTable struct {
 	Name    string
-	Len     uint8
+	Len     int
 	Columns []ast.Column
 	Rows    []Row
+}
+
+func (mt MemoTable) columnNames() []ast.ColumnName {
+	cn := make([]ast.ColumnName, 0, len(mt.Columns))
+	for _, c := range mt.Columns {
+		cn = append(cn, c.Name)
+	}
+	return cn
 }
 
 // Show scheme of a table like below
