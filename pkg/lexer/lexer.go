@@ -46,6 +46,7 @@ type Token struct {
 
 var (
 	ErrQuerySyntaxBracketIncomplete = errors.New("missing ( or )")
+	ErrQuerySyntaxWhereIncomplete   = errors.New("where cluase is incomplete")
 	ErrQuerySyntaxInvalid           = errors.New("syntax is wrong")
 )
 
@@ -103,7 +104,8 @@ func Lex(source string) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		fmt.Printf("select %d rows ok!\n%v\n", len(rows), rows)
+		fmt.Printf("select %d rows ok!\n", len(rows))
+		storage.ShowRows(rows, stmt)
 		return rows, nil
 	}
 	return nil, ErrQuerySyntaxInvalid

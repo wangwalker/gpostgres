@@ -38,8 +38,8 @@ REPL:
 				showCommand(commandType, "")
 				break REPL
 			case parser.SchemeCommand:
-				scheme, _ := storage.ShowTableSchemes(table)
-				showCommand(commandType, scheme)
+				storage.ShowTableSchemes(table)
+				showCommand(commandType, "")
 			case parser.HelpCommand, parser.UnknownCommand:
 				showCommand(commandType, "")
 			}

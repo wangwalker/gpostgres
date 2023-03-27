@@ -128,6 +128,9 @@ func composeSelectStmt(tokens []Token) (*ast.QueryStmtSelectValues, error) {
 			whereClause.Cmp = ast.CmpKindLte
 		}
 	}
+	if whereClause.EitherEmpty() {
+		return nil, ErrQuerySyntaxWhereIncomplete
+	}
 	stmt.ColumnNames = columnNames
 	stmt.Where = whereClause
 	return &stmt, nil

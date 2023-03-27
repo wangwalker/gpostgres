@@ -65,8 +65,20 @@ type WhereClause struct {
 	Cmp    CmpKind
 }
 
+// Tests if both column and value is empty.
 func (w WhereClause) IsEmpty() bool {
 	if w.Column == "" && w.Value == "" {
+		return true
+	}
+	return false
+}
+
+// Tests if either column or value is empty.
+func (w WhereClause) EitherEmpty() bool {
+	if w.IsEmpty() {
+		return false
+	}
+	if w.Column == "" || w.Value == "" {
 		return true
 	}
 	return false

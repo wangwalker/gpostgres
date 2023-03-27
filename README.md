@@ -39,8 +39,33 @@ In this section, our goal is that can run `INSERT`, `SELETE`, `UPDATE` and `DELE
 To achieve this goal, we can split it into several steps below.
 
 - [x] Support `INSERT` sql
-- [ ] Support `SELECT` sql
+- [x] Support `SELECT` sql
 - [ ] Support `UPDATE` and `DELETE` sqls
+
+```bash
+postgres# select * from tusers;
+select 3 rows ok!
+ name       |  age   | 
+ ---------- +  ----- + 
+ 'wwwww'    |  12    | 
+ 'cwwwwwww' |  13    | 
+ 'd'        |  15    | 
+
+postgres# select (age, name) from tusers;
+select 3 rows ok!
+ age   |  name       | 
+ ----- +  ---------- + 
+ 12    |  'wwwww'    | 
+ 13    |  'cwwwwwww' | 
+ 15    |  'd'        | 
+
+postgres# select * from tusers where age > 12;
+select 2 rows ok!
+ name       |  age   | 
+ ---------- +  ----- + 
+ 'cwwwwwww' |  13    | 
+ 'd'        |  15    | 
+ ```
 
 ### Section 3
 

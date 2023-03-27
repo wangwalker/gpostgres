@@ -26,12 +26,13 @@ func init() {
 			{Name: "age", Kind: ast.ColumnKindInt},
 		},
 		Rows: []Row{
-			[]Field{"'w'", "12"},
-			[]Field{"'c'", "13"},
+			[]Field{"'wwwww'", "12"},
+			[]Field{"'cwwwwwww'", "13"},
 			[]Field{"'d'", "15"},
 		},
 		Len: 3,
 	}
+	table.SetColumnNames()
 	tables[table.Name] = table
 }
 
@@ -41,6 +42,7 @@ func CreateTable(stmt *ast.QueryStmtCreateTable) error {
 		return ErrTableExisted
 	}
 	table := NewTable(*stmt)
+	table.SetColumnNames()
 	tables[tableName] = *table
 	return nil
 }
@@ -91,9 +93,13 @@ func Select(stmt *ast.QueryStmtSelectValues) ([]Row, error) {
 	}
 	// check if the selected columns have been defined
 	for _, sc := range stmt.ColumnNames {
-		if !slices.Contains(table.columnNames(), sc) {
+		if !slices.Contains(table.ColumnNames, sc) {
 			return nil, ErrColumnNamesNotMatched
 		}
+	}
+	// check if the column from where clause has been defined
+	if !stmt.Where.IsEmpty() && !slices.Contains(table.ColumnNames, stmt.Where.Column) {
+		return nil, ErrColumnNamesNotMatched
 	}
 
 	filtered := table.Rows
@@ -101,17 +107,19 @@ func Select(stmt *ast.QueryStmtSelectValues) ([]Row, error) {
 		filtered = table.filter(stmt.Where)
 	}
 	rows := make([]Row, 0)
-	if stmt.ContainsAllColumns || len(stmt.ColumnNames) == len(table.Columns) {
+	if stmt.ContainsAllColumns {
 		return filtered, nil
 	}
 
-	selectedIndexes := indexesOf(stmt.ColumnNames, table.columnNames())
+	selectedIndexes := indexesOf(stmt.ColumnNames, table.ColumnNames)
 	for _, r := range filtered {
 		row := make([]Field, 0, len(stmt.ColumnNames))
-		for i, f := range r {
-			if slices.Contains(selectedIndexes, i) {
-				f := f
-				row = append(row, f)
+		for _, si := range selectedIndexes {
+			for i, f := range r {
+				if si == i {
+					f := f
+					row = append(row, f)
+				}
 			}
 		}
 		rows = append(rows, row)
@@ -119,6 +127,10 @@ func Select(stmt *ast.QueryStmtSelectValues) ([]Row, error) {
 	return rows, nil
 }
 
+// Returns the indexes of sub slice from a slice. For expample:
+// names := []string{"a", "b", "c"}
+// subnames := []string{"b", "c"}
+// indexesOf(subnames, names) = []int{1, 2}
 func indexesOf(sub, columns []ast.ColumnName) []int {
 	selectedIndexes := make([]int, 0, len(sub))
 	for _, n := range sub {
@@ -131,42 +143,40 @@ func indexesOf(sub, columns []ast.ColumnName) []int {
 	return selectedIndexes
 }
 
-func (mt MemoTable) filter(with ast.WhereClause) []Row {
+// Returns all the rows meeting where clause for one table.
+func (mt MemoTable) filter(where ast.WhereClause) []Row {
 	filtered := make([]Row, 0, mt.Len)
-	columnIndex := slices.Index(mt.columnNames(), with.Column)
+	columnIndex := slices.Index(mt.ColumnNames, where.Column)
 OUTER:
-	for _, cn := range mt.columnNames() {
+	for _, cn := range mt.ColumnNames {
 		for _, r := range mt.Rows {
-			if cn != with.Column {
+			if cn != where.Column {
 				continue OUTER
 			}
-			switch with.Cmp {
-			case ast.CmpKindEq:
-				if r[columnIndex] == Field(with.Value) {
-					filtered = append(filtered, r)
-				}
-			case ast.CmpKindNotEq:
-				if r[columnIndex] != Field(with.Value) {
-					filtered = append(filtered, r)
-				}
-			case ast.CmpKindGt:
-				if r[columnIndex] > Field(with.Value) {
-					filtered = append(filtered, r)
-				}
-			case ast.CmpKindGte:
-				if r[columnIndex] >= Field(with.Value) {
-					filtered = append(filtered, r)
-				}
-			case ast.CmpKindLt:
-				if r[columnIndex] < Field(with.Value) {
-					filtered = append(filtered, r)
-				}
-			case ast.CmpKindLte:
-				if r[columnIndex] <= Field(with.Value) {
-					filtered = append(filtered, r)
-				}
+			if r.matched(where, columnIndex) {
+				filtered = append(filtered, r)
 			}
 		}
 	}
 	return filtered
+}
+
+// Tests if one row if matched with where clause.
+// Note: the row is just slice of Field, so using index indicates which field to test.
+func (r Row) matched(where ast.WhereClause, index int) bool {
+	switch where.Cmp {
+	case ast.CmpKindEq:
+		return r[index] == Field(where.Value)
+	case ast.CmpKindNotEq:
+		return r[index] != Field(where.Value)
+	case ast.CmpKindGt:
+		return r[index] > Field(where.Value)
+	case ast.CmpKindGte:
+		return r[index] >= Field(where.Value)
+	case ast.CmpKindLt:
+		return r[index] < Field(where.Value)
+	case ast.CmpKindLte:
+		return r[index] <= Field(where.Value)
+	}
+	return false
 }

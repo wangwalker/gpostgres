@@ -179,6 +179,39 @@ func TestSelectFailsWhenTableExistButWrongColumns(t *testing.T) {
 	}
 }
 
+func TestSelectFailsWhenTableExistButWrongWhere(t *testing.T) {
+	// GIVEN
+	createAndInsert := []string{
+		"create table stu1 (name text, age int);",
+		"insert into stu1 values ('a', 11)",
+		"insert into stu1 (name, age) values ('a', 12)",
+		"insert into stu1 values ('a', 13), ('b', 12);",
+		"insert into stu1 (name, age) values ('a', 14), ('b', 12);",
+	}
+	for i, tt := range createAndInsert {
+		_, err := Lex(tt)
+		if err != nil {
+			t.Errorf("%s: given: test %d should ok, but err isn't null", t.Name(), i)
+		}
+	}
+
+	// WHEN
+	selectTests := []string{
+		// "select * from stu1 == 'a';",
+		"select * from stu1 nn == 'a';",
+		"select * from stu1 where == 'a';",
+		"select * from stu1 where name = 'a';",
+		"select (name, age) from stu1 where name === 'a';",
+	}
+	// THEN
+	for i, tt := range selectTests {
+		_, err := Lex(tt)
+		if err == nil {
+			t.Errorf("%s: then: %d should fail, but err is null", t.Name(), i)
+		}
+	}
+}
+
 func TestSelectSucceed(t *testing.T) {
 	// GIVEN
 	createAndInsert := []string{
