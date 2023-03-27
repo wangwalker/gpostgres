@@ -104,8 +104,8 @@ func Lex(source string) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		fmt.Printf("select %d rows ok!\n", len(rows))
 		storage.ShowRows(rows, stmt)
+		fmt.Printf("select %d rows ok!\n", len(rows))
 		return rows, nil
 	}
 	return nil, ErrQuerySyntaxInvalid

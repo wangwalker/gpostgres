@@ -44,27 +44,25 @@ To achieve this goal, we can split it into several steps below.
 
 ```bash
 postgres# select * from tusers;
+| name       | age   | 
+|------------+--------
+| 'wwwww'    | 12    | 
+| 'cwwwwwww' | 13    | 
+| 'd'        | 15    | 
 select 3 rows ok!
- name       |  age   | 
- ---------- +  ----- + 
- 'wwwww'    |  12    | 
- 'cwwwwwww' |  13    | 
- 'd'        |  15    | 
-
-postgres# select (age, name) from tusers;
-select 3 rows ok!
- age   |  name       | 
- ----- +  ---------- + 
- 12    |  'wwwww'    | 
- 13    |  'cwwwwwww' | 
- 15    |  'd'        | 
-
 postgres# select * from tusers where age > 12;
+| name       | age   | 
+|------------+--------
+| 'cwwwwwww' | 13    | 
+| 'd'        | 15    | 
 select 2 rows ok!
- name       |  age   | 
- ---------- +  ----- + 
- 'cwwwwwww' |  13    | 
- 'd'        |  15    | 
+postgres# select (age, name) from tusers;
+| age   | name       | 
+|-------+-------------
+| 12    | 'wwwww'    | 
+| 13    | 'cwwwwwww' | 
+| 15    | 'd'        | 
+select 3 rows ok!
  ```
 
 ### Section 3
