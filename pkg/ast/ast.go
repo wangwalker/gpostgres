@@ -90,3 +90,14 @@ type QueryStmtSelectValues struct {
 	ContainsAllColumns bool
 	Where              WhereClause
 }
+
+type ColumnUpdatedValue struct {
+	Name  ColumnName
+	Value string
+}
+
+type QueryStmtUpdateValues struct {
+	TableName string
+	Values    []ColumnUpdatedValue
+	Where     WhereClause
+}

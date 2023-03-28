@@ -14,8 +14,8 @@ const (
 	TokenKindKeywordCreate TokenKind = iota
 	TokenKindKeywordInsert
 	TokenKindKeywordSelect
-	TokenKindKeywordAlter
-	TokenKindKeywordDrop
+	TokenKindKeywordUpdate
+	TokenKindKeywordDelete
 	TokenKindTable
 	TokenKindTableName
 	TokenKindInto
@@ -37,6 +37,8 @@ const (
 	TokenKindCmpLte
 	TokenKindCmpLeft
 	TokenKindCmpRight
+	TokenKindSet
+	TokenKindColumnNameValue
 )
 
 type Token struct {
@@ -59,6 +61,8 @@ func tokenize(source string) ([]Token, error) {
 		return tokenizeInsert(fields)
 	case "select":
 		return tokenizeSelect(fields)
+	case "update":
+		return tokenizeUpdate(fields)
 	}
 	return nil, nil
 }
@@ -107,6 +111,17 @@ func Lex(source string) (interface{}, error) {
 		storage.ShowRows(rows, stmt)
 		fmt.Printf("select %d rows ok!\n", len(rows))
 		return rows, nil
+	case TokenKindKeywordUpdate:
+		stmt, err := composeUpdateStmt(tokens)
+		if err != nil {
+			return nil, err
+		}
+		n, err := storage.Update(stmt)
+		if err != nil {
+			return nil, err
+		}
+		fmt.Printf("Update %d row ok!\n", n)
+		return n, nil
 	}
 	return nil, ErrQuerySyntaxInvalid
 }

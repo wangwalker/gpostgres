@@ -2,7 +2,6 @@ package storage
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/wangwalker/gpostgres/pkg/ast"
 	"golang.org/x/exp/slices"
@@ -68,7 +67,6 @@ func Insert(stmt *ast.QueryStmtInsertValues) (int, error) {
 	}
 	// TODO: support default value for column when inserts partial columns
 	rows := make([]Row, 0, len(stmt.Rows))
-	fmt.Printf("before new inserted rows: %v\n", stmt.Rows)
 	for _, r := range stmt.Rows {
 		row := make([]Field, 0, len(r))
 		for _, v := range r {
@@ -79,7 +77,6 @@ func Insert(stmt *ast.QueryStmtInsertValues) (int, error) {
 		}
 		rows = append(rows, row)
 	}
-	fmt.Printf("after new inserted rows: %v\n", rows)
 	table.Rows = append(table.Rows, rows...)
 	table.Len = len(table.Rows)
 	tables[table.Name] = table
@@ -104,7 +101,7 @@ func Select(stmt *ast.QueryStmtSelectValues) ([]Row, error) {
 
 	filtered := table.Rows
 	if !stmt.Where.IsEmpty() {
-		filtered = table.filter(stmt.Where)
+		filtered, _ = table.filter(stmt.Where)
 	}
 	rows := make([]Row, 0)
 	if stmt.ContainsAllColumns {
@@ -127,6 +124,29 @@ func Select(stmt *ast.QueryStmtSelectValues) ([]Row, error) {
 	return rows, nil
 }
 
+func Update(stmt *ast.QueryStmtUpdateValues) (int, error) {
+	table, ok := tables[stmt.TableName]
+	if !ok {
+		return 0, ErrTableNotExisted
+	}
+	// check if the selected columns have been defined
+	for _, c := range stmt.Values {
+		if !slices.Contains(table.ColumnNames, c.Name) {
+			return 0, ErrColumnNamesNotMatched
+		}
+	}
+	// check if the column from where clause has been defined
+	if !stmt.Where.IsEmpty() && !slices.Contains(table.ColumnNames, stmt.Where.Column) {
+		return 0, ErrColumnNamesNotMatched
+	}
+
+	filtered, _ := table.filter(stmt.Where)
+	for _, r := range filtered {
+		r.update(stmt.Values, table)
+	}
+	return len(filtered), nil
+}
+
 // Returns the indexes of sub slice from a slice. For expample:
 // names := []string{"a", "b", "c"}
 // subnames := []string{"b", "c"}
@@ -143,22 +163,24 @@ func indexesOf(sub, columns []ast.ColumnName) []int {
 	return selectedIndexes
 }
 
-// Returns all the rows meeting where clause for one table.
-func (mt MemoTable) filter(where ast.WhereClause) []Row {
+// Returns all the rows and indexes meeting where clause for one table.
+func (mt MemoTable) filter(where ast.WhereClause) ([]Row, []int) {
 	filtered := make([]Row, 0, mt.Len)
+	indexes := make([]int, 0, mt.Len)
 	columnIndex := slices.Index(mt.ColumnNames, where.Column)
 OUTER:
 	for _, cn := range mt.ColumnNames {
-		for _, r := range mt.Rows {
+		for i, r := range mt.Rows {
 			if cn != where.Column {
 				continue OUTER
 			}
 			if r.matched(where, columnIndex) {
 				filtered = append(filtered, r)
+				indexes = append(indexes, i)
 			}
 		}
 	}
-	return filtered
+	return filtered, indexes
 }
 
 // Tests if one row if matched with where clause.
@@ -179,4 +201,19 @@ func (r Row) matched(where ast.WhereClause, index int) bool {
 		return r[index] <= Field(where.Value)
 	}
 	return false
+}
+
+func (r Row) update(newValues []ast.ColumnUpdatedValue, table MemoTable) {
+	sub := make([]ast.ColumnName, 0, len(newValues))
+	for _, v := range newValues {
+		sub = append(sub, v.Name)
+	}
+	indexes := indexesOf(sub, table.ColumnNames)
+	for _, nv := range newValues {
+		for i := range r {
+			if slices.Contains(indexes, i) {
+				r[i] = Field(nv.Value)
+			}
+		}
+	}
 }

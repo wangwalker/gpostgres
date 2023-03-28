@@ -253,3 +253,107 @@ func TestSelectSucceed(t *testing.T) {
 		}
 	}
 }
+
+func TestUpdateFailsWhenTableExistButWrongColumns(t *testing.T) {
+	// GIVEN
+	createAndInsert := []string{
+		"create table utu (name text, age int);",
+		"insert into utu values ('a', 11)",
+		"insert into utu (name, age) values ('a', 12)",
+		"insert into utu values ('a', 13), ('b', 12);",
+		"insert into utu (name, age) values ('a', 14), ('b', 12);",
+	}
+	for i, tt := range createAndInsert {
+		_, err := Lex(tt)
+		if err != nil {
+			t.Errorf("%s: given: test %d should ok, but err isn't null", t.Name(), i)
+		}
+	}
+
+	// WHEN
+	updateTests := []string{
+		"update utu a = 1  where name == 'a';",
+		"update utu set a = 1  where name == 'a';",
+		"update utu set name = 'www', b where name == 'a';",
+		"update utu set name = 'www', age = 0, c where name == 'a';",
+		"update utu set name = 'www', c, age = 0 where name == 'a';",
+	}
+	// THEN
+	for i, tt := range updateTests {
+		_, err := Lex(tt)
+		if err == nil {
+			t.Errorf("%s: then: %d should fail, but err is null", t.Name(), i)
+		}
+	}
+}
+
+func TestUpdateFailsWhenTableExistButWrongWhere(t *testing.T) {
+	// GIVEN
+	createAndInsert := []string{
+		"create table utu1 (name text, age int);",
+		"insert into utu1 values ('a', 11)",
+		"insert into utu1 (name, age) values ('a', 12)",
+		"insert into utu1 values ('a', 13), ('b', 12);",
+		"insert into utu1 (name, age) values ('a', 14), ('b', 12);",
+	}
+	for i, tt := range createAndInsert {
+		_, err := Lex(tt)
+		if err != nil {
+			t.Errorf("%s: given: test %d should ok, but err isn't null", t.Name(), i)
+		}
+	}
+
+	// WHEN
+	selectTests := []string{
+		"update utu1 set name = 'www', age = 0 nn == 'a';",
+		"update utu1 set name = 'www', age = 0 where == 'a';",
+		"update utu1 set name = 'www', age = 0 where name = 'a';",
+		"update utu1 set name = 'www', age = 0 where name === 'a';",
+	}
+	// THEN
+	for i, tt := range selectTests {
+		_, err := Lex(tt)
+		if err == nil {
+			t.Errorf("%s: then: %d should fail, but err is null", t.Name(), i)
+		}
+	}
+}
+
+func TestUpdateSucceed(t *testing.T) {
+	// GIVEN
+	createAndInsert := []string{
+		"create table utu2 (name text, age int);",
+		"insert into utu2 values ('a', 11)",
+		"insert into utu2 (name, age) values ('a', 12)",
+		"insert into utu2 values ('aa', 13), ('b', 22);",
+		"insert into utu2 (name, age) values ('aa', 14), ('bb', 12);",
+	}
+	for i, tt := range createAndInsert {
+		_, err := Lex(tt)
+		if err != nil {
+			t.Errorf("%s: given: test %d should ok, but err isn't null", t.Name(), i)
+		}
+	}
+
+	// WHEN
+	selectTests := []struct {
+		source string
+		rows   int
+	}{
+		{"update utu2 set name = 'abc' where name == 'a';", 2},
+		{"update utu2 set name = 'a', age = 20 where name == 'a';", 0},
+		{"update utu2 set name = 'a', age = 20 where name == 'aa';", 2},
+		{"update utu2 set age = 22 where name == 'abc';", 2},
+	}
+	// THEN
+	for i, tt := range selectTests {
+		r, err := Lex(tt.source)
+		if err != nil {
+			t.Errorf("%s: then: test %d should ok, but err isn't null", t.Name(), i)
+		}
+		rows, ok := r.(int)
+		if !ok || rows != tt.rows {
+			t.Errorf("%s: then: test %d should update %d rows, but updated %d ", t.Name(), i, tt.rows, rows)
+		}
+	}
+}

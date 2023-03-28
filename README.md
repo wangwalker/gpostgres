@@ -34,13 +34,13 @@ quit
 ```
 ### Section 2
 
-In this section, our goal is that can run `INSERT`, `SELETE`, `UPDATE` and `DELETE` statements like `CREATE`. And in this stage, all our data is in memory.
+In this section, our goal is that can run `INSERT`, `SELETE`, `UPDATE` statements like `CREATE`. And in this stage, all our data is in memory.
 
 To achieve this goal, we can split it into several steps below.
 
 - [x] Support `INSERT` sql
 - [x] Support `SELECT` sql
-- [ ] Support `UPDATE` and `DELETE` sqls
+- [x] Support `UPDATE` sql
 
 ```bash
 postgres# select * from tusers;
@@ -50,19 +50,28 @@ postgres# select * from tusers;
 | 'cwwwwwww' | 13    | 
 | 'd'        | 15    | 
 select 3 rows ok!
-postgres# select * from tusers where age > 12;
+postgres# insert into tusers values ('walker', 23) ('jack', 33);
+insert 2 rows ok!
+postgres# select * from tusers;
 | name       | age   | 
 |------------+--------
+| 'wwwww'    | 12    | 
 | 'cwwwwwww' | 13    | 
 | 'd'        | 15    | 
-select 2 rows ok!
-postgres# select (age, name) from tusers;
-| age   | name       | 
-|-------+-------------
-| 12    | 'wwwww'    | 
-| 13    | 'cwwwwwww' | 
-| 15    | 'd'        | 
-select 3 rows ok!
+| 'walker'   | 23    | 
+| 'jack'     | 33    | 
+select 5 rows ok!
+postgres# update tusers set name = 'tony' where name == 'd';
+Update 1 row ok!
+postgres# select * from tusers;
+| name       | age   | 
+|------------+--------
+| 'wwwww'    | 12    | 
+| 'cwwwwwww' | 13    | 
+| 'tony'     | 15    | 
+| 'walker'   | 23    | 
+| 'jack'     | 33    | 
+select 5 rows ok!
  ```
 
 ### Section 3
