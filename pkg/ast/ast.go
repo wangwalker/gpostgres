@@ -24,8 +24,8 @@ func (c ColumnKind) String() string {
 }
 
 type Column struct {
-	Name ColumnName
-	Kind ColumnKind
+	Name ColumnName `json:"name"`
+	Kind ColumnKind `json:"kind"`
 }
 
 const (

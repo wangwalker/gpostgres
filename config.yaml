@@ -1,0 +1,4 @@
+database: postgres
+scheme_dir: ./storage/scheme
+data_dir: ./storage/data
+mode: debug

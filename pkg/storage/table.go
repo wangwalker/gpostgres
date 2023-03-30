@@ -1,7 +1,9 @@
 package storage
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/wangwalker/gpostgres/pkg/ast"
@@ -15,12 +17,67 @@ type Field string
 
 type Row []Field
 
-type MemoTable struct {
-	Name        string
-	Len         int
-	Columns     []ast.Column
-	ColumnNames []ast.ColumnName
-	Rows        []Row
+type Table struct {
+	Name        string           `json:"name"`
+	Len         int              `json:"len"`
+	Columns     []ast.Column     `json:"columns"`
+	ColumnNames []ast.ColumnName `json:"column_names"`
+	Rows        []Row            `json:"rows"`
+}
+
+// SaveScheme saves the scheme of a table to a file with json format when creating a table.
+func (t Table) saveScheme() {
+	_, err := os.Stat(config.SchemeDir)
+	if os.IsNotExist(err) {
+		os.Mkdir(config.SchemeDir, 0755)
+	}
+	path := t.schemePath()
+	bytes, err := json.Marshal(t)
+	if err != nil {
+		fmt.Printf("Failed to marshal table %s scheme to json: %s", t.Name, err)
+		return
+	}
+	err = os.WriteFile(path, bytes, 0644)
+	if err != nil {
+		fmt.Printf("Failed to write table %s scheme to file: %s", t.Name, err)
+	}
+}
+
+// returns the path of a table's scheme based on the table name and scheme dir.
+func (t Table) schemePath() string {
+	return fmt.Sprintf("%s/%s.json", config.SchemeDir, t.Name)
+}
+
+// LoadScheme loads all schemes of tables from files when starting the program.
+func loadSchemes() {
+	files, err := os.ReadDir(config.SchemeDir)
+	if err != nil {
+		fmt.Printf("Failed to read data directory %s: %s", config.DataDir, err)
+		return
+	}
+	for _, f := range files {
+		if !f.IsDir() && strings.HasSuffix(f.Name(), ".json") {
+			loadScheme(f.Name())
+		}
+	}
+}
+
+// loadScheme loads a scheme of a table from a file with json format.
+func loadScheme(name string) {
+	path := fmt.Sprintf("%s/%s", config.SchemeDir, name)
+	file, err := os.Open(path)
+	if err != nil {
+		fmt.Printf("Failed to open file %s: %s", path, err)
+		return
+	}
+
+	var table Table
+	err = json.NewDecoder(file).Decode(&table)
+	if err != nil {
+		fmt.Printf("Failed to decode json file %s: %s", path, err)
+		return
+	}
+	tables[table.Name] = table
 }
 
 // Show scheme of a table like below
@@ -30,27 +87,27 @@ event_id | integer                     |
 title    | character varying(255)      |
 venue_id | integer                     |
 */
-func (mt MemoTable) String() string {
+func (t Table) String() string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("| %-10s | %-20s|\n", "Column", "Type"))
 	sb.WriteString(fmt.Sprintf("|-%-10s-+-%-20s|\n", strings.Repeat("-", 10), strings.Repeat("-", 20)))
-	for _, c := range mt.Columns {
+	for _, c := range t.Columns {
 		sb.WriteString(fmt.Sprintf("| %-10s | %-20s|\n", c.Name, c.Kind))
 	}
 	return sb.String()
 }
 
-func (mt *MemoTable) SetColumnNames() {
-	cn := make([]ast.ColumnName, 0, len(mt.Columns))
-	for _, c := range mt.Columns {
+func (t *Table) setColumnNames() {
+	cn := make([]ast.ColumnName, 0, len(t.Columns))
+	for _, c := range t.Columns {
 		cn = append(cn, c.Name)
 	}
-	mt.ColumnNames = cn
+	t.ColumnNames = cn
 }
 
-func NewTable(stmt ast.QueryStmtCreateTable) *MemoTable {
+func NewTable(stmt ast.QueryStmtCreateTable) *Table {
 	rows := make([]Row, 0, tableRowDefaultCount)
-	return &MemoTable{
+	return &Table{
 		Name:    stmt.Name,
 		Columns: stmt.Columns,
 		Rows:    rows,

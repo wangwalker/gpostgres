@@ -14,34 +14,14 @@ var (
 	ErrColumnNamesNotMatched = errors.New("table column names aren't matched")
 )
 
-var tables = make(map[string]MemoTable)
-
-// for testing from REPL
-func init() {
-	table := MemoTable{
-		Name: "tusers",
-		Columns: []ast.Column{
-			{Name: "name", Kind: ast.ColumnKindText},
-			{Name: "age", Kind: ast.ColumnKindInt},
-		},
-		Rows: []Row{
-			[]Field{"'wwwww'", "12"},
-			[]Field{"'cwwwwwww'", "13"},
-			[]Field{"'d'", "15"},
-		},
-		Len: 3,
-	}
-	table.SetColumnNames()
-	tables[table.Name] = table
-}
-
 func CreateTable(stmt *ast.QueryStmtCreateTable) error {
 	tableName := stmt.Name
 	if _, ok := tables[tableName]; ok {
 		return ErrTableExisted
 	}
 	table := NewTable(*stmt)
-	table.SetColumnNames()
+	table.setColumnNames()
+	table.saveScheme()
 	tables[tableName] = *table
 	return nil
 }
@@ -164,7 +144,7 @@ func indexesOf(sub, columns []ast.ColumnName) []int {
 }
 
 // Returns all the rows and indexes meeting where clause for one table.
-func (mt MemoTable) filter(where ast.WhereClause) ([]Row, []int) {
+func (mt Table) filter(where ast.WhereClause) ([]Row, []int) {
 	filtered := make([]Row, 0, mt.Len)
 	indexes := make([]int, 0, mt.Len)
 	columnIndex := slices.Index(mt.ColumnNames, where.Column)
@@ -203,7 +183,7 @@ func (r Row) matched(where ast.WhereClause, index int) bool {
 	return false
 }
 
-func (r Row) update(newValues []ast.ColumnUpdatedValue, table MemoTable) {
+func (r Row) update(newValues []ast.ColumnUpdatedValue, table Table) {
 	sub := make([]ast.ColumnName, 0, len(newValues))
 	for _, v := range newValues {
 		sub = append(sub, v.Name)
