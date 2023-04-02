@@ -80,8 +80,8 @@ In this section, we will support data persistence in local file system in some s
 
 For this goal, we need to design meta data format for each table, binary table data file format and index file format one by one.
 
-- [ ] Design table meta data format
-- [ ] Design binary data file format
+- [x] Design table meta data format: JOSN
+- [x] Design binary data file format: Avro binary format
 - [ ] Design index file format with B-tree
 - [ ] Design index file format with LSM-tree
 

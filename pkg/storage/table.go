@@ -1,11 +1,14 @@
 package storage
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
+	"github.com/linkedin/goavro/v2"
 	"github.com/wangwalker/gpostgres/pkg/ast"
 )
 
@@ -17,12 +20,14 @@ type Field string
 
 type Row []Field
 
+// TODO: decode avro data to rows
 type Table struct {
 	Name        string           `json:"name"`
 	Len         int              `json:"len"`
 	Columns     []ast.Column     `json:"columns"`
 	ColumnNames []ast.ColumnName `json:"column_names"`
 	Rows        []Row            `json:"rows"`
+	avroCodec   *goavro.Codec
 }
 
 // SaveScheme saves the scheme of a table to a file with json format when creating a table.
@@ -43,9 +48,14 @@ func (t Table) saveScheme() {
 	}
 }
 
-// returns the path of a table's scheme based on the table name and scheme dir.
+// returns the path of a table's local scheme based on the table name and scheme dir.
 func (t Table) schemePath() string {
 	return fmt.Sprintf("%s/%s.json", config.SchemeDir, t.Name)
+}
+
+// returns the path of a table's local data based on the table name and data dir.
+func (t Table) dataPath() string {
+	return fmt.Sprintf("%s/%s.avro", config.DataDir, t.Name)
 }
 
 // LoadScheme loads all schemes of tables from files when starting the program.
@@ -78,6 +88,79 @@ func loadScheme(name string) {
 		return
 	}
 	tables[table.Name] = table
+}
+
+// GenerateAvroCodec returns the avro codec based on table scheme. As goavro says,
+// codec ought to be cached to avoid the overhead of parsing the schema.
+func (t Table) generateAvroCodec() (*goavro.Codec, error) {
+	if t.avroCodec != nil {
+		return t.avroCodec, nil
+	}
+	var fields strings.Builder
+	for i, c := range t.Columns {
+		if c.Kind == ast.ColumnKindInt {
+			fields.WriteString(fmt.Sprintf(`{"name": "%s", "type": "int", "default": 0}`, c.Name))
+		} else {
+			fields.WriteString(fmt.Sprintf(`{"name": "%s", "type": "string", "default": ""}`, c.Name))
+		}
+		if i < len(t.Columns)-1 {
+			fields.WriteString(",")
+		}
+	}
+	codec, err := goavro.NewCodec(`{
+		"type": "record",
+		"name": "User",
+		"fields" : [` + fields.String() + "]" + `
+	}`)
+	if err != nil {
+		return nil, err
+	}
+	t.avroCodec = codec
+	return codec, nil
+}
+
+// SaveRows saves rows of a table to a file with Avro binary format when inserting a row.
+// For many rows, we should call this serially.
+func (t Table) saveRows(rows []Row) {
+	_, err := os.Stat(config.DataDir)
+	if os.IsNotExist(err) {
+		os.Mkdir(config.DataDir, 0755)
+	}
+	codec, err := t.generateAvroCodec()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	f, err := os.OpenFile(t.dataPath(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer f.Close()
+	w := bufio.NewWriter(f)
+	for _, r := range rows {
+		record := make(map[string]interface{})
+		for i, c := range t.Columns {
+			name := string(c.Name)
+			if c.Kind == ast.ColumnKindInt {
+				ii, _ := strconv.Atoi(string(r[i]))
+				record[name] = ii
+			} else {
+				record[name] = string(r[i])
+			}
+		}
+		bytes, err := codec.BinaryFromNative(nil, record)
+		// using \n to separate differenct rows
+		bytes = append(bytes, '\n')
+		if err != nil {
+			fmt.Println(err)
+		}
+		_, err = w.Write(bytes)
+		if err != nil {
+			fmt.Printf("Write %v to file failed.\n", bytes)
+		}
+	}
+	w.Flush()
 }
 
 // Show scheme of a table like below
