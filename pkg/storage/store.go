@@ -16,6 +16,10 @@ func init() {
 		fmt.Println(err.Error())
 		return
 	}
+	if c == nil {
+		// run in test mode
+		return
+	}
 	config = *c
 
 	// First, loads all schemes to restore tables

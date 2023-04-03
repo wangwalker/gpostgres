@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -20,10 +21,25 @@ type Config struct {
 }
 
 func readConfig() (*Config, error) {
+	// get current workd directory
+	dir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	fmt.Println(dir)
+	items, err := os.ReadDir(dir)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	for _, item := range items {
+		fmt.Println(item.Name())
+	}
+
 	var config Config
 	file, err := os.Open("config.yaml")
 	if err != nil {
-		log.Fatal(err.Error())
+		// possibly run in test mode
+		return nil, nil
 	}
 	defer file.Close()
 	if file != nil {
