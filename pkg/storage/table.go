@@ -3,7 +3,9 @@ package storage
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -14,13 +16,25 @@ import (
 
 const (
 	tableRowDefaultCount uint8 = 100
+	rowSeparator         byte  = '\n'
+)
+
+var (
+	errConvertIntFailed  = errors.New("failed to convert binary to int")
+	errConvertTextFailed = errors.New("failed to convert binary to text")
 )
 
 type Field string
 
+// Purify removes the quotes of a string when inserting new rows.
+func (f Field) purify() Field {
+	pure := strings.ReplaceAll(string(f), "'", "")
+	pure = strings.ReplaceAll(pure, "\"", "")
+	return Field(pure)
+}
+
 type Row []Field
 
-// TODO: decode avro data to rows
 type Table struct {
 	Name        string           `json:"name"`
 	Len         int              `json:"len"`
@@ -30,7 +44,7 @@ type Table struct {
 	avroCodec   *goavro.Codec
 }
 
-// SaveScheme saves the scheme of a table to a file with json format when creating a table.
+// saveScheme saves the scheme of a table to file with json format when created.
 func (t Table) saveScheme() {
 	_, err := os.Stat(config.SchemeDir)
 	if os.IsNotExist(err) {
@@ -48,17 +62,18 @@ func (t Table) saveScheme() {
 	}
 }
 
-// returns the path of a table's local scheme based on the table name and scheme dir.
+// returns the path of a table's local scheme file.
 func (t Table) schemePath() string {
 	return fmt.Sprintf("%s/%s.json", config.SchemeDir, t.Name)
 }
 
-// returns the path of a table's local data based on the table name and data dir.
+// returns the path of a table's local data file.
 func (t Table) dataPath() string {
 	return fmt.Sprintf("%s/%s.avro", config.DataDir, t.Name)
 }
 
 // LoadScheme loads all schemes of tables from files when starting the program.
+// It should be called in init function of storage package.
 func loadSchemes() {
 	files, err := os.ReadDir(config.SchemeDir)
 	if err != nil {
@@ -107,7 +122,8 @@ func (t Table) generateAvroCodec() (*goavro.Codec, error) {
 			fields.WriteString(",")
 		}
 	}
-	codec, err := goavro.NewCodec(`{
+	var err error
+	t.avroCodec, err = goavro.NewCodec(`{
 		"type": "record",
 		"name": "User",
 		"fields" : [` + fields.String() + "]" + `
@@ -115,13 +131,12 @@ func (t Table) generateAvroCodec() (*goavro.Codec, error) {
 	if err != nil {
 		return nil, err
 	}
-	t.avroCodec = codec
-	return codec, nil
+	return t.avroCodec, nil
 }
 
 // SaveRows saves rows of a table to a file with Avro binary format when inserting a row.
 // For many rows, we should call this serially.
-func (t Table) saveRows(rows []Row) {
+func (t Table) saveRows(rows []Row) (int, error) {
 	_, err := os.Stat(config.DataDir)
 	if os.IsNotExist(err) {
 		os.Mkdir(config.DataDir, 0755)
@@ -129,12 +144,12 @@ func (t Table) saveRows(rows []Row) {
 	codec, err := t.generateAvroCodec()
 	if err != nil {
 		fmt.Println(err)
-		return
+		return 0, err
 	}
 	f, err := os.OpenFile(t.dataPath(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		fmt.Println(err)
-		return
+		return 0, err
 	}
 	defer f.Close()
 	w := bufio.NewWriter(f)
@@ -150,8 +165,7 @@ func (t Table) saveRows(rows []Row) {
 			}
 		}
 		bytes, err := codec.BinaryFromNative(nil, record)
-		// using \n to separate differenct rows
-		bytes = append(bytes, '\n')
+		bytes = append(bytes, rowSeparator)
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -161,6 +175,89 @@ func (t Table) saveRows(rows []Row) {
 		}
 	}
 	w.Flush()
+	return len(rows), nil
+}
+
+// LoadRows loads binary rows data of all tables from local binary data to native Row when
+// program launches. Specifically, it should be called after finishing loading schemes.
+func loadRows() {
+	if len(tables) <= 0 {
+		return
+	}
+	newTables := make(map[string]Table)
+	for _, t := range tables {
+		newT := t
+		rows, err := t.loadRows()
+		if err == nil && len(rows) > 0 {
+			newT.Rows = append(newT.Rows, rows...)
+		}
+		newTables[t.Name] = newT
+	}
+	tables = newTables
+}
+
+// LoadRows loads binary rows of a table from local Avro format to Rows.
+// It is the reversed process of SaveRows.
+func (t *Table) loadRows() ([]Row, error) {
+	_, err := os.Stat(config.DataDir)
+	if os.IsNotExist(err) {
+		os.Mkdir(config.DataDir, 0755)
+	}
+	_, err = os.Stat(t.dataPath())
+	if os.IsNotExist(err) {
+		return nil, err
+	}
+	codec, err := t.generateAvroCodec()
+	if err != nil {
+		return nil, err
+	}
+	f, err := os.OpenFile(t.dataPath(), os.O_RDONLY, 0644)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	r := bufio.NewReader(f)
+	rows := make([]Row, 0, len(t.Columns))
+	for {
+		line, err := r.ReadBytes(rowSeparator)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+		if len(line) == 1 && line[0] == rowSeparator {
+			continue
+		}
+		native, _, err := codec.NativeFromBinary(line)
+		if err != nil || native == nil {
+			return nil, err
+		}
+		record, ok := native.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		row := make(Row, 0, len(t.Columns))
+		for _, c := range t.Columns {
+			v := record[string(c.Name)]
+			if c.Kind == ast.ColumnKindInt {
+				iv, ok := v.(int32)
+				if !ok {
+					return nil, errConvertIntFailed
+				}
+				row = append(row, Field(strconv.Itoa(int(iv))))
+			} else {
+				sv, ok := v.(string)
+				if !ok {
+					return nil, errConvertTextFailed
+				}
+				row = append(row, Field(sv).purify())
+			}
+		}
+		rows = append(rows, row)
+
+	}
+	return rows, nil
 }
 
 // Show scheme of a table like below

@@ -50,7 +50,7 @@ func Insert(stmt *ast.QueryStmtInsertValues) (int, error) {
 	for _, r := range stmt.Rows {
 		row := make([]Field, 0, len(r))
 		for _, v := range r {
-			row = append(row, Field(v))
+			row = append(row, Field(v).purify())
 		}
 		if len(row) != columns {
 			return 0, ErrValuesIncomplete

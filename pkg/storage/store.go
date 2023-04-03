@@ -10,7 +10,6 @@ var tables = make(map[string]Table)
 // The global configrations
 var config Config
 
-// for testing from REPL
 func init() {
 	c, err := readConfig()
 	if err != nil {
@@ -19,5 +18,8 @@ func init() {
 	}
 	config = *c
 
+	// First, loads all schemes to restore tables
 	loadSchemes()
+	// Second, loads binary data to restore rows
+	loadRows()
 }
