@@ -29,18 +29,30 @@ func search(n *node, key int) *node {
 
 // Insert inserts a key into the B-tree, which is the outer interface.
 func insert(n *node, key int) *node {
-	if len(n.keys) == 2*t-1 {
-		newRoot := &node{
-			keys:     []int{n.keys[t-1]},
-			children: []*node{n, nil},
-			isLeaf:   false,
+	i := len(n.keys) - 1
+	if n.isLeaf {
+		n.keys = append(n.keys, 0)
+		j := i
+		for ; j >= 0 && key < n.keys[j]; j-- {
+			n.keys[j+1] = n.keys[j]
 		}
-
-		splitChild(newRoot, 1, n)
-		insertNonFull(newRoot, key)
-		return newRoot
+		n.keys[j+1] = key
+		return n
 	}
-	return insertNonFull(n, key)
+	for i >= 0 && key < n.keys[i] {
+		i--
+	}
+	i++
+	if len(n.children[i].keys) == 2*t-1 {
+		splitChild(n, i, n.children[i])
+		// recalculate the index after split node
+		i = len(n.keys) - 1
+		for i >= 0 && key < n.keys[i] {
+			i--
+		}
+		i++
+	}
+	return insert(n.children[i], key)
 }
 
 // Split node when the number of the keys = [2*t-1].
@@ -81,31 +93,35 @@ func splitChild(parent *node, i int, child *node) {
 		isLeaf:   false,
 	}
 	parent.children[i] = subParent
+	merge(parent, subParent, i)
 }
 
-// Insert a key into a non-full node.
-func insertNonFull(n *node, key int) *node {
-	i := len(n.keys) - 1
-	if n.isLeaf {
-		n.keys = append(n.keys, 0)
-		j := i
-		for ; j >= 0 && key < n.keys[j]; j-- {
-			n.keys[j+1] = n.keys[j]
-		}
-		n.keys[j+1] = key
-		return n
+// Merge merges parent and child node when the number of parent's keys < 2*t-1.
+// child node is the new node after split, so it has just one key and two children.
+// It should be called after splitChild to balance tree.
+func merge(parent, child *node, i int) {
+	if len(parent.keys) == 2*t-1 {
+		return
 	}
-	for i >= 0 && key < n.keys[i] {
-		i--
+	if i == 0 {
+		parent.keys = append(child.keys, parent.keys...)
+		parent.children = append(child.children, parent.children[1:]...)
+	} else if len(parent.keys) > i {
+		// splict parent keys two pieces, the middle one will is the only key of child node
+		key1, key2 := parent.keys[:i], parent.keys[i:]
+		parent.keys = append(key1, child.keys[0])
+		parent.keys = append(parent.keys, key2...)
+		// splict parent children two pieces, will ignore the middle one
+		child1, child2 := parent.children[:i], parent.children[i+1:]
+		parent.children = append(child1, child.children...)
+		parent.children = append(parent.children, child2...)
+	} else {
+		// just append the key and children of child node to parent
+		parent.keys = append(parent.keys, child.keys[0])
+		parent.children = append(parent.children, child.children...)
 	}
-	i++
-	if len(n.children[i].keys) == 2*t-1 {
-		splitChild(n, i, n.children[i])
-	}
-	return insertNonFull(n.children[i], key)
 }
 
-// Traverse the B-tree.
 var level = 0
 
 func traverse(n *node) {
@@ -130,7 +146,7 @@ func test() {
 	traverse(root)
 
 	_ = insert(root, 40)
-	_ = insert(root, 140)
+	_ = insert(root, 38)
 	_ = insert(root, 75)
 
 	traverse(root)
