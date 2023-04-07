@@ -1,105 +1,116 @@
 package storage
 
-import "fmt"
+import (
+	"fmt"
+
+	"golang.org/x/exp/constraints"
+)
 
 // Using t to represent the half of degree of the B-tree,
 // which means the maximum number of keys in a node is 2t-1.
 const t = 2
 
-type node struct {
-	keys     []int
-	children []*node
+type node[T constraints.Ordered] struct {
+	keys     []T
+	children []*node[T]
 	isLeaf   bool
+	level    int
 }
 
 // Search key in the B-tree.
-func search(n *node, key int) *node {
+func (tree *node[T]) search(key T) *node[T] {
 	i := 0
-	for i < len(n.keys) && key > n.keys[i] {
+	for i < len(tree.keys) && key > tree.keys[i] {
 		i++
 	}
-	if i < len(n.keys) && key == n.keys[i] {
-		return n
+	if i < len(tree.keys) && key == tree.keys[i] {
+		return tree
 	}
-	if n.isLeaf {
+	if tree.isLeaf {
 		return nil
 	}
-	return search(n.children[i], key)
+	return tree.children[i].search(key)
 }
 
 // Insert inserts a key into the B-tree, which is the outer interface.
-func insert(n *node, key int) *node {
-	i := len(n.keys) - 1
-	if n.isLeaf {
-		n.keys = append(n.keys, 0)
+func (tree *node[T]) insert(key T) *node[T] {
+	i := len(tree.keys) - 1
+	if tree.isLeaf {
+		tree.keys = append(tree.keys, key)
 		j := i
-		for ; j >= 0 && key < n.keys[j]; j-- {
-			n.keys[j+1] = n.keys[j]
+		for ; j >= 0 && key < tree.keys[j]; j-- {
+			tree.keys[j+1] = tree.keys[j]
 		}
-		n.keys[j+1] = key
-		return n
+		tree.keys[j+1] = key
+		return tree
 	}
-	for i >= 0 && key < n.keys[i] {
+	for i >= 0 && key < tree.keys[i] {
 		i--
 	}
 	i++
-	if len(n.children[i].keys) == 2*t-1 {
-		splitChild(n, i, n.children[i])
+	if len(tree.children[i].keys) == 2*t-1 {
+		tree.splitChild(i, tree.children[i])
 		// recalculate the index after split node
-		i = len(n.keys) - 1
-		for i >= 0 && key < n.keys[i] {
+		i = len(tree.keys) - 1
+		for i >= 0 && key < tree.keys[i] {
 			i--
 		}
 		i++
 	}
-	return insert(n.children[i], key)
+	return tree.children[i].insert(key)
 }
 
 // Split node when the number of the keys = [2*t-1].
 // In this case, first split the original child into two pieces with the
 // middle key, then constuct a new node with the middle key and two children,
 // finally insert the new node into the  parent node.
-func splitChild(parent *node, i int, child *node) {
+func (parent *node[T]) splitChild(i int, child *node[T]) {
 	// split original child into two pieces with the middle key,
 	// child1, child2 = child[:t-1], child[t:]
-	var child1, child2 *node
+	var child1, child2 *node[T]
+	level := child.level + 1
 	if child.isLeaf {
-		child1 = &node{
+		child1 = &node[T]{
 			keys:     child.keys[:t-1],
 			children: nil,
 			isLeaf:   child.isLeaf,
+			level:    level,
 		}
-		child2 = &node{
+		child2 = &node[T]{
 			keys:     child.keys[t:],
 			children: nil,
 			isLeaf:   child.isLeaf,
+			level:    level,
 		}
 	} else {
-		child1 = &node{
+		child1 = &node[T]{
 			keys:     child.keys[:t-1],
 			children: child.children[:t-1],
 			isLeaf:   child.isLeaf,
+			level:    level,
 		}
-		child2 = &node{
+		child2 = &node[T]{
 			keys:     child.keys[t:],
 			children: child.children[t:],
 			isLeaf:   child.isLeaf,
+			level:    level,
 		}
 	}
 
-	subParent := &node{
-		keys:     []int{child.keys[t-1]},
-		children: []*node{child1, child2},
+	subParent := &node[T]{
+		keys:     []T{child.keys[t-1]},
+		children: []*node[T]{child1, child2},
 		isLeaf:   false,
+		level:    child.level,
 	}
 	parent.children[i] = subParent
-	merge(parent, subParent, i)
+	parent.merge(subParent, i)
 }
 
 // Merge merges parent and child node when the number of parent's keys < 2*t-1.
 // child node is the new node after split, so it has just one key and two children.
 // It should be called after splitChild to balance tree.
-func merge(parent, child *node, i int) {
+func (parent *node[T]) merge(child *node[T], i int) {
 	if len(parent.keys) == 2*t-1 {
 		return
 	}
@@ -109,51 +120,34 @@ func merge(parent, child *node, i int) {
 	} else if len(parent.keys) > i {
 		// splict parent keys two pieces, the middle one will is the only key of child node
 		key1, key2 := parent.keys[:i], parent.keys[i:]
-		parent.keys = append(key1, child.keys[0])
-		parent.keys = append(parent.keys, key2...)
+		keys := make([]T, 0, len(key1)+len(key2)+1)
+		keys = append(keys, key1...)
+		keys = append(keys, child.keys[0])
+		keys = append(keys, key2...)
+		parent.keys = keys
 		// splict parent children two pieces, will ignore the middle one
 		child1, child2 := parent.children[:i], parent.children[i+1:]
-		parent.children = append(child1, child.children...)
-		parent.children = append(parent.children, child2...)
+		children := make([]*node[T], 0, len(child1)+len(child2)+1)
+		children = append(children, child1...)
+		children = append(children, child.children...)
+		children = append(children, child2...)
+		parent.children = children
 	} else {
 		// just append the key and children of child node to parent
 		parent.keys = append(parent.keys, child.keys[0])
-		parent.children = append(parent.children, child.children...)
+		parent.children = append(parent.children[:i], child.children...)
+	}
+	// update level of children
+	for _, c := range parent.children {
+		c.level = parent.level + 1
 	}
 }
 
-var level = 0
-
-func traverse(n *node) {
-	fmt.Printf("level = %d, keys = %+v\n", level, n.keys)
-	for i := range n.children {
-		if !n.isLeaf && n.children[i] != nil {
-			traverse(n.children[i])
+func traverse[T constraints.Ordered](tree *node[T]) {
+	fmt.Printf("level = %d, keys = %+v\n", tree.level, tree.keys)
+	for i := range tree.children {
+		if !tree.isLeaf && tree.children[i] != nil {
+			traverse(tree.children[i])
 		}
 	}
-}
-
-func test() {
-	root := &node{
-		keys: []int{50, 100},
-		children: []*node{
-			{keys: []int{10, 20, 30}, isLeaf: true},
-			{keys: []int{60, 70, 80}, isLeaf: true},
-			{keys: []int{110, 120, 130}, isLeaf: true}},
-		isLeaf: false,
-	}
-
-	traverse(root)
-
-	_ = insert(root, 40)
-	_ = insert(root, 38)
-	_ = insert(root, 75)
-
-	traverse(root)
-
-	c1 := search(root, 40)
-	c2 := search(root, 140)
-	c3 := search(root, 75)
-	c4 := search(root, 90)
-	fmt.Println(c1, c2, c3, c4)
 }
