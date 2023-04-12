@@ -108,7 +108,7 @@ func (parent *node[T]) splitChild(i int, child *node[T]) {
 }
 
 // Merge merges parent and child node when the number of parent's keys < 2*t-1.
-// child node is the new node after split, so it has just one key and two children.
+// Child node is the new node after spliting, so it has just one key and two children.
 // It should be called after splitChild to balance tree.
 func (parent *node[T]) merge(child *node[T], i int) {
 	if len(parent.keys) == 2*t-1 {
@@ -118,19 +118,19 @@ func (parent *node[T]) merge(child *node[T], i int) {
 		parent.keys = append(child.keys, parent.keys...)
 		parent.children = append(child.children, parent.children[1:]...)
 	} else if len(parent.keys) > i {
-		// splict parent keys two pieces, the middle one will is the only key of child node
-		key1, key2 := parent.keys[:i], parent.keys[i:]
-		keys := make([]T, 0, len(key1)+len(key2)+1)
-		keys = append(keys, key1...)
+		// split parent's keys into two pieces, the middle one will be the only key at child node
+		k1, k2 := parent.keys[:i], parent.keys[i:]
+		keys := make([]T, 0, len(k1)+len(k2)+1)
+		keys = append(keys, k1...)
 		keys = append(keys, child.keys[0])
-		keys = append(keys, key2...)
+		keys = append(keys, k2...)
 		parent.keys = keys
-		// splict parent children two pieces, will ignore the middle one
-		child1, child2 := parent.children[:i], parent.children[i+1:]
-		children := make([]*node[T], 0, len(child1)+len(child2)+1)
-		children = append(children, child1...)
+		// split parent children into two pieces, will ignore the middle one
+		c1, c2 := parent.children[:i], parent.children[i+1:]
+		children := make([]*node[T], 0, len(c1)+len(c2)+1)
+		children = append(children, c1...)
 		children = append(children, child.children...)
-		children = append(children, child2...)
+		children = append(children, c2...)
 		parent.children = children
 	} else {
 		// just append the key and children of child node to parent
