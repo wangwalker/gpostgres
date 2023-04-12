@@ -2,49 +2,59 @@ package storage
 
 import (
 	"fmt"
-
-	"golang.org/x/exp/constraints"
 )
 
 // Using t to represent the half of degree of the B-tree,
 // which means the maximum number of keys in a node is 2t-1.
 const t = 2
 
-type node[T constraints.Ordered] struct {
-	keys     []T
-	children []*node[T]
+// key is the key of the B-tree. It contains metadata for the btree node,
+// name is used to compare the order of keys, value is used to store other information,
+// such as the offset or id of the row.
+type key struct {
+	name  string
+	value int32
+}
+
+func (k key) lt(other key) bool {
+	return k.name < other.name
+}
+
+type node struct {
+	keys     []key
+	children []*node
 	isLeaf   bool
 	level    int
 }
 
 // Search key in the B-tree.
-func (tree *node[T]) search(key T) *node[T] {
+func (tree *node) search(k string) int32 {
 	i := 0
-	for i < len(tree.keys) && key > tree.keys[i] {
+	for i < len(tree.keys) && k > tree.keys[i].name {
 		i++
 	}
-	if i < len(tree.keys) && key == tree.keys[i] {
-		return tree
+	if i < len(tree.keys) && k == tree.keys[i].name {
+		return tree.keys[i].value
 	}
 	if tree.isLeaf {
-		return nil
+		return -1
 	}
-	return tree.children[i].search(key)
+	return tree.children[i].search(k)
 }
 
 // Insert inserts a key into the B-tree, which is the outer interface.
-func (tree *node[T]) insert(key T) *node[T] {
+func (tree *node) insert(k key) *node {
 	i := len(tree.keys) - 1
 	if tree.isLeaf {
-		tree.keys = append(tree.keys, key)
+		tree.keys = append(tree.keys, k)
 		j := i
-		for ; j >= 0 && key < tree.keys[j]; j-- {
+		for ; j >= 0 && k.lt(tree.keys[j]); j-- {
 			tree.keys[j+1] = tree.keys[j]
 		}
-		tree.keys[j+1] = key
+		tree.keys[j+1] = k
 		return tree
 	}
-	for i >= 0 && key < tree.keys[i] {
+	for i >= 0 && k.lt(tree.keys[i]) {
 		i--
 	}
 	i++
@@ -52,44 +62,44 @@ func (tree *node[T]) insert(key T) *node[T] {
 		tree.splitChild(i, tree.children[i])
 		// recalculate the index after split node
 		i = len(tree.keys) - 1
-		for i >= 0 && key < tree.keys[i] {
+		for i >= 0 && k.lt(tree.keys[i]) {
 			i--
 		}
 		i++
 	}
-	return tree.children[i].insert(key)
+	return tree.children[i].insert(k)
 }
 
 // Split node when the number of the keys = [2*t-1].
 // In this case, first split the original child into two pieces with the
 // middle key, then constuct a new node with the middle key and two children,
 // finally insert the new node into the  parent node.
-func (parent *node[T]) splitChild(i int, child *node[T]) {
+func (parent *node) splitChild(i int, child *node) {
 	// split original child into two pieces with the middle key,
 	// child1, child2 = child[:t-1], child[t:]
-	var child1, child2 *node[T]
+	var child1, child2 *node
 	level := child.level + 1
 	if child.isLeaf {
-		child1 = &node[T]{
+		child1 = &node{
 			keys:     child.keys[:t-1],
 			children: nil,
 			isLeaf:   child.isLeaf,
 			level:    level,
 		}
-		child2 = &node[T]{
+		child2 = &node{
 			keys:     child.keys[t:],
 			children: nil,
 			isLeaf:   child.isLeaf,
 			level:    level,
 		}
 	} else {
-		child1 = &node[T]{
+		child1 = &node{
 			keys:     child.keys[:t-1],
 			children: child.children[:t-1],
 			isLeaf:   child.isLeaf,
 			level:    level,
 		}
-		child2 = &node[T]{
+		child2 = &node{
 			keys:     child.keys[t:],
 			children: child.children[t:],
 			isLeaf:   child.isLeaf,
@@ -97,9 +107,9 @@ func (parent *node[T]) splitChild(i int, child *node[T]) {
 		}
 	}
 
-	subParent := &node[T]{
-		keys:     []T{child.keys[t-1]},
-		children: []*node[T]{child1, child2},
+	subParent := &node{
+		keys:     []key{child.keys[t-1]},
+		children: []*node{child1, child2},
 		isLeaf:   false,
 		level:    child.level,
 	}
@@ -110,7 +120,7 @@ func (parent *node[T]) splitChild(i int, child *node[T]) {
 // Merge merges parent and child node when the number of parent's keys < 2*t-1.
 // Child node is the new node after spliting, so it has just one key and two children.
 // It should be called after splitChild to balance tree.
-func (parent *node[T]) merge(child *node[T], i int) {
+func (parent *node) merge(child *node, i int) {
 	if len(parent.keys) == 2*t-1 {
 		return
 	}
@@ -120,14 +130,14 @@ func (parent *node[T]) merge(child *node[T], i int) {
 	} else if len(parent.keys) > i {
 		// split parent's keys into two pieces, the middle one will be the only key at child node
 		k1, k2 := parent.keys[:i], parent.keys[i:]
-		keys := make([]T, 0, len(k1)+len(k2)+1)
+		keys := make([]key, 0, len(k1)+len(k2)+1)
 		keys = append(keys, k1...)
 		keys = append(keys, child.keys[0])
 		keys = append(keys, k2...)
 		parent.keys = keys
 		// split parent children into two pieces, will ignore the middle one
 		c1, c2 := parent.children[:i], parent.children[i+1:]
-		children := make([]*node[T], 0, len(c1)+len(c2)+1)
+		children := make([]*node, 0, len(c1)+len(c2)+1)
 		children = append(children, c1...)
 		children = append(children, child.children...)
 		children = append(children, c2...)
@@ -143,7 +153,7 @@ func (parent *node[T]) merge(child *node[T], i int) {
 	}
 }
 
-func traverse[T constraints.Ordered](tree *node[T]) {
+func traverse(tree *node) {
 	fmt.Printf("level = %d, keys = %+v\n", tree.level, tree.keys)
 	for i := range tree.children {
 		if !tree.isLeaf && tree.children[i] != nil {
