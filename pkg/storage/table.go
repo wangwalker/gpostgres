@@ -40,7 +40,8 @@ type Table struct {
 	Len         int              `json:"len"`
 	Columns     []ast.Column     `json:"columns"`
 	ColumnNames []ast.ColumnName `json:"column_names"`
-	Rows        []Row            `json:"rows"`
+	Rows        []Row
+	Indexes     []Index
 	avroCodec   *goavro.Codec
 }
 
@@ -157,11 +158,17 @@ func (t Table) saveRows(rows []Row) (int, error) {
 		record := make(map[string]interface{})
 		for i, c := range t.Columns {
 			name := string(c.Name)
+			var v interface{}
 			if c.Kind == ast.ColumnKindInt {
 				ii, _ := strconv.Atoi(string(r[i]))
-				record[name] = ii
+				v = ii
 			} else {
-				record[name] = string(r[i])
+				v = string(r[i])
+			}
+			record[name] = v
+			// update index if needed
+			if idx := t.Index(name); idx != nil {
+				idx.Insert(string(r[i]), 11)
 			}
 		}
 		bytes, err := codec.BinaryFromNative(nil, record)

@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"fmt"
 	"log"
 	"os"
 
@@ -16,25 +15,13 @@ type Config struct {
 	SchemeDir string `yaml:"scheme_dir"`
 	// data_dir is the directory where the database binary files are stored.
 	DataDir string `yaml:"data_dir"`
+	// index_dir is the directory where the index files are stored.
+	IndexDir string `yaml:"index_dir"`
 	// mode is the mode of the database. It can be "memory" or "disk".
 	Mode string `yaml:"mode"`
 }
 
 func readConfig() (*Config, error) {
-	// get current workd directory
-	dir, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-	fmt.Println(dir)
-	items, err := os.ReadDir(dir)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-	for _, item := range items {
-		fmt.Println(item.Name())
-	}
-
 	var config Config
 	file, err := os.Open("config.yaml")
 	if err != nil {

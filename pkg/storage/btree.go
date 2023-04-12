@@ -14,6 +14,8 @@ const t = 2
 type key struct {
 	name  string
 	value int32
+	page  uint8
+	block uint8
 }
 
 func (k key) lt(other key) bool {

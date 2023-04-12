@@ -5,8 +5,8 @@ import "testing"
 // Tests lt of key
 func TestKeyLt(t *testing.T) {
 	// GIVEN
-	k1 := key{"a", 1}
-	k2 := key{"b", 2}
+	k1 := key{"a", 1, 0, 0}
+	k2 := key{"b", 2, 0, 0}
 
 	// WHEN
 	lt := k1.lt(k2)
@@ -20,11 +20,11 @@ func TestKeyLt(t *testing.T) {
 func TestStringBtree(t *testing.T) {
 	// GIVEN
 	root := &node{
-		keys: []key{{"e", 0}, {"k", 30}},
+		keys: []key{{"e", 0, 0, 0}, {"k", 30, 0, 0}},
 		children: []*node{
-			{keys: []key{{"a", 1}, {"b", 2}, {"v", 3}}, isLeaf: true, level: 2},
-			{keys: []key{{"fd", 4}, {"gd", 5}, {"h2", 6}}, isLeaf: true, level: 2},
-			{keys: []key{{"m1", 7}, {"m2", 8}, {"root", 9}}, isLeaf: true, level: 2}},
+			{keys: []key{{"a", 1, 0, 0}, {"b", 2, 0, 0}, {"v", 3, 0, 0}}, isLeaf: true, level: 2},
+			{keys: []key{{"fd", 4, 0, 0}, {"gd", 5, 0, 0}, {"h2", 6, 0, 0}}, isLeaf: true, level: 2},
+			{keys: []key{{"m1", 7, 0, 0}, {"m2", 8, 0, 0}, {"root", 9, 0, 0}}, isLeaf: true, level: 2}},
 		isLeaf: false,
 		level:  1,
 	}
@@ -32,15 +32,15 @@ func TestStringBtree(t *testing.T) {
 	traverse(root)
 
 	// WHEN
-	root.insert(key{"food", 10})
-	root.insert(key{"godd", 11})
-	root.insert(key{"hi", 12})
-	root.insert(key{"internet", 13})
-	root.insert(key{"j", 14})
-	root.insert(key{"kitty", 15})
-	root.insert(key{"loop", 16})
-	root.insert(key{"moon", 17})
-	root.insert(key{"string", 18})
+	root.insert(key{"food", 10, 0, 0})
+	root.insert(key{"godd", 11, 0, 0})
+	root.insert(key{"hi", 12, 0, 0})
+	root.insert(key{"internet", 13, 0, 0})
+	root.insert(key{"j", 14, 0, 0})
+	root.insert(key{"kitty", 15, 0, 0})
+	root.insert(key{"loop", 16, 0, 0})
+	root.insert(key{"moon", 17, 0, 0})
+	root.insert(key{"string", 18, 0, 0})
 
 	// THEN
 	t.Log("traversing the tree after inserting food, godd, hi, internet, j, kitty, loop, moon, string")
