@@ -60,8 +60,8 @@ func Insert(stmt *ast.QueryStmtInsertValues) (int, error) {
 	table.Rows = append(table.Rows, rows...)
 	table.Len = len(table.Rows)
 	tables[table.Name] = table
-	// write rows binary data to disk
-	table.saveRows(rows)
+	// write rows binary data to local file
+	table.save(rows)
 	return len(rows), nil
 }
 

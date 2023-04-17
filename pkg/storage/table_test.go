@@ -105,7 +105,7 @@ func TestGenerateAvroCodec(t *testing.T) {
 	}
 
 	// WHEN
-	codec, err := table.generateAvroCodec()
+	codec, err := table.composeAvroCodec()
 
 	// THEN
 	if err != nil {
@@ -133,13 +133,13 @@ func TestSaveRows(t *testing.T) {
 	r1 := Row{Field("wang"), Field("18")}
 	r2 := Row{Field("li"), Field("20")}
 	rows = append(rows, r1, r2)
-	n, err := t1.saveRows(rows)
+	n, err := t1.save(rows)
 
 	// THEN
 	if err != nil {
 		t.Errorf("failed to save rows: %s", err)
 	}
-	if n != 2 {
+	if n != len(rows) {
 		t.Errorf("saved rows number is not correct")
 	}
 }
@@ -161,11 +161,11 @@ func TestLoadRows(t *testing.T) {
 	r1 := Row{Field("wang"), Field("18")}
 	r2 := Row{Field("li"), Field("20")}
 	rows = append(rows, r1, r2)
-	t1.saveRows(rows)
+	t1.save(rows)
 
 	// WHEN
 	loadSchemes()
-	loadRows()
+	load()
 
 	// THEN
 	t2, ok := tables["testuser5"]
@@ -186,5 +186,51 @@ func TestLoadRows(t *testing.T) {
 	}
 	if t2.Rows[1][1] != "20" {
 		t.Errorf("table row field is not correct")
+	}
+}
+
+func TestSaveRowsAndSearchWithIndex(t *testing.T) {
+	// GIVEN
+	t1 := Table{
+		Name: "testuser6",
+		Columns: []ast.Column{
+			{Name: "name", Kind: ast.ColumnKindText},
+			{Name: "age", Kind: ast.ColumnKindInt},
+		},
+	}
+	t1.createIndex()
+	t1.saveScheme()
+
+	// WHEN
+	rows := make([]Row, 0, 4)
+	r1 := Row{Field("wang"), Field("18")}
+	r2 := Row{Field("li"), Field("20")}
+	r3 := Row{Field("zhao"), Field("28")}
+	r4 := Row{Field("qian"), Field("30")}
+	rows = append(rows, r1, r2, r3, r4)
+	_, err := t1.save(rows)
+
+	// THEN
+	if err != nil {
+		t.Errorf("failed to save rows: %s", err)
+	}
+	if idx := t1.index.get("name"); idx == nil {
+		t.Errorf("index is not created")
+	}
+	// Now the index value is just the row index
+	if idx := t1.index.get("age"); idx == nil {
+		t.Errorf("index is not created")
+	}
+	if idx := t1.index.search("name", "wang"); idx != 0 {
+		t.Errorf("index search result is not correct")
+	}
+	if idx := t1.index.search("name", "li"); idx != 1 {
+		t.Errorf("index search result is not correct")
+	}
+	if idx := t1.index.search("name", "zhao"); idx != 2 {
+		t.Errorf("index search result is not correct")
+	}
+	if idx := t1.index.search("name", "qian"); idx != 3 {
+		t.Errorf("index search result is not correct")
 	}
 }

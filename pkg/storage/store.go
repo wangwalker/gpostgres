@@ -25,5 +25,5 @@ func init() {
 	// First, loads all schemes to restore tables
 	loadSchemes()
 	// Second, loads binary data to restore rows
-	loadRows()
+	load()
 }

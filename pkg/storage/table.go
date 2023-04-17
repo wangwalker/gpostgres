@@ -41,7 +41,7 @@ type Table struct {
 	Columns     []ast.Column     `json:"columns"`
 	ColumnNames []ast.ColumnName `json:"column_names"`
 	Rows        []Row
-	Indexes     []Index
+	index       *Index
 	avroCodec   *goavro.Codec
 }
 
@@ -88,7 +88,7 @@ func loadSchemes() {
 	}
 }
 
-// loadScheme loads a scheme of a table from a file with json format.
+// LoadScheme loads table scheme from local json file when starting the program.
 func loadScheme(name string) {
 	path := fmt.Sprintf("%s/%s", config.SchemeDir, name)
 	file, err := os.Open(path)
@@ -106,9 +106,10 @@ func loadScheme(name string) {
 	tables[table.Name] = table
 }
 
-// GenerateAvroCodec returns the avro codec based on table scheme. As goavro says,
-// codec ought to be cached to avoid the overhead of parsing the schema.
-func (t Table) generateAvroCodec() (*goavro.Codec, error) {
+// ComposeAvroCodec composes avro codec based on table scheme. As goavro says,
+// codec ought to be cached to avoid the overhead of parsing the schema. so we
+// save the codec in table struct after finishing composing.
+func (t Table) composeAvroCodec() (*goavro.Codec, error) {
 	if t.avroCodec != nil {
 		return t.avroCodec, nil
 	}
@@ -135,14 +136,14 @@ func (t Table) generateAvroCodec() (*goavro.Codec, error) {
 	return t.avroCodec, nil
 }
 
-// SaveRows saves rows of a table to a file with Avro binary format when inserting a row.
+// Save saves rows to local Avro binary file when inserting rows.
 // For many rows, we should call this serially.
-func (t Table) saveRows(rows []Row) (int, error) {
+func (t Table) save(rows []Row) (int, error) {
 	_, err := os.Stat(config.DataDir)
 	if os.IsNotExist(err) {
 		os.Mkdir(config.DataDir, 0755)
 	}
-	codec, err := t.generateAvroCodec()
+	codec, err := t.composeAvroCodec()
 	if err != nil {
 		fmt.Println(err)
 		return 0, err
@@ -153,8 +154,9 @@ func (t Table) saveRows(rows []Row) (int, error) {
 		return 0, err
 	}
 	defer f.Close()
+	// write rows into file with Avro binary format
 	w := bufio.NewWriter(f)
-	for _, r := range rows {
+	for ii, r := range rows {
 		record := make(map[string]interface{})
 		for i, c := range t.Columns {
 			name := string(c.Name)
@@ -166,9 +168,11 @@ func (t Table) saveRows(rows []Row) (int, error) {
 				v = string(r[i])
 			}
 			record[name] = v
-			// update index if needed
-			if idx := t.Index(name); idx != nil {
-				idx.Insert(string(r[i]), 11)
+			// insert indexes with row index now
+			// TODO: insert indexes with more info with file format later
+			if idx := t.index; idx != nil {
+				v := int32(len(t.Rows) + ii)
+				idx.insert(name, string(r[i]), v)
 			}
 		}
 		bytes, err := codec.BinaryFromNative(nil, record)
@@ -185,9 +189,10 @@ func (t Table) saveRows(rows []Row) (int, error) {
 	return len(rows), nil
 }
 
-// LoadRows loads binary rows data of all tables from local binary data to native Row when
-// program launches. Specifically, it should be called after finishing loading schemes.
-func loadRows() {
+// Load loads rows data for all tables from local binary data to native row when
+// program launches.
+// Note, it should be called after finishing loading schemes.
+func load() {
 	if len(tables) <= 0 {
 		return
 	}
@@ -214,7 +219,7 @@ func (t *Table) loadRows() ([]Row, error) {
 	if os.IsNotExist(err) {
 		return nil, err
 	}
-	codec, err := t.generateAvroCodec()
+	codec, err := t.composeAvroCodec()
 	if err != nil {
 		return nil, err
 	}
@@ -267,23 +272,6 @@ func (t *Table) loadRows() ([]Row, error) {
 	return rows, nil
 }
 
-// Show scheme of a table like below
-/**
- Column  |            Type             |
-event_id | integer                     |
-title    | character varying(255)      |
-venue_id | integer                     |
-*/
-func (t Table) String() string {
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("| %-10s | %-20s|\n", "Column", "Type"))
-	sb.WriteString(fmt.Sprintf("|-%-10s-+-%-20s|\n", strings.Repeat("-", 10), strings.Repeat("-", 20)))
-	for _, c := range t.Columns {
-		sb.WriteString(fmt.Sprintf("| %-10s | %-20s|\n", c.Name, c.Kind))
-	}
-	return sb.String()
-}
-
 func (t *Table) setColumnNames() {
 	cn := make([]ast.ColumnName, 0, len(t.Columns))
 	for _, c := range t.Columns {
@@ -298,95 +286,5 @@ func NewTable(stmt ast.QueryStmtCreateTable) *Table {
 		Name:    stmt.Name,
 		Columns: stmt.Columns,
 		Rows:    rows,
-	}
-}
-
-func ShowTableSchemes(t string) {
-	if t == "" {
-		names := make([]string, 0, len(tables))
-		for table := range tables {
-			names = append(names, table)
-		}
-		fmt.Printf("List of relations\n%s", strings.Join(names, "\n"))
-		return
-	}
-	table, ok := tables[t]
-	if !ok {
-		fmt.Printf("Don't find any relations named %s", t)
-	}
-	fmt.Println(table.String())
-}
-
-func ShowRows(rows []Row, stmt *ast.QueryStmtSelectValues) {
-	if len(rows) == 0 {
-		return
-	}
-	columns := stmt.ColumnNames
-	if len(columns) == 0 {
-		table := tables[stmt.TableName]
-		columns = append(columns, table.ColumnNames...)
-	}
-	var sb, sp strings.Builder
-	sp1, sp2, sp3, sp4, sp5 := " | ", "-+-", "| ", "|-", "--"
-	widthFormats := columnFormats(rows, columns)
-	sb.WriteString(sp3)
-	sp.WriteString(sp4)
-	for i, c := range columns {
-		f := widthFormats[i]
-		sb.WriteString(fmt.Sprintf(f.format, c, sp1))
-		if i < len(columns)-1 {
-			sp.WriteString(fmt.Sprintf(f.format, strings.Repeat("-", f.width), sp2))
-		} else {
-			sp.WriteString(fmt.Sprintf(f.format, strings.Repeat("-", f.width), sp5))
-		}
-	}
-	sp.WriteByte('\n')
-	sb.WriteByte('\n')
-	sb.WriteString(sp.String())
-	for ri, r := range rows {
-		sb.WriteString(sp3)
-		for i, f := range r {
-			sb.WriteString(fmt.Sprintf(widthFormats[i].format, f, sp1))
-		}
-		if ri < len(rows)-1 {
-			sb.WriteByte('\n')
-		}
-	}
-	fmt.Println(sb.String())
-}
-
-type widthFormat struct {
-	width  int
-	format string
-}
-
-func columnFormats(rows []Row, columnNames []ast.ColumnName) []widthFormat {
-	widths := make([]int, 0, len(columnNames))
-	for _, n := range columnNames {
-		widths = append(widths, len(n))
-	}
-	for _, r := range rows {
-		for c, f := range r {
-			if len(f) > widths[c] {
-				widths[c] = len(f)
-			}
-		}
-	}
-	formats := make([]widthFormat, 0, len(widths))
-	for _, w := range widths {
-		formats = append(formats, formatForWidth(w))
-	}
-	return formats
-}
-
-func formatForWidth(w int) widthFormat {
-	if w <= 5 {
-		return widthFormat{5, "%-5s%s"}
-	} else if w <= 10 {
-		return widthFormat{10, "%-10s%s"}
-	} else if w <= 20 {
-		return widthFormat{20, "%-20s%s"}
-	} else {
-		return widthFormat{50, "%-50s%s"}
 	}
 }

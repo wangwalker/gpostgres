@@ -1,40 +1,55 @@
 package storage
 
+// Index is all indexes of a table. As every column could has an index, so
+// we can create multiple indexes for a table with a map, and the key is the
+// column name, value is the index of the column when creating table.
+// So by default, we will create indexes for all columns of a table.
 type Index struct {
-	Name string // column name of table
-	tree *node
+	name string // table name
+	ids  map[string]*node
 }
 
-// NewIndex creates a new index for a table.
-func NewIndex(name string) *Index {
-	return &Index{
-		Name: name,
-		tree: &node{isLeaf: true, level: 1},
+// NewIndex creates new index for table when creating.
+func NewIndex(t Table) *Index {
+	ids := make(map[string]*node)
+	for _, c := range t.Columns {
+		ids[string(c.Name)] = &node{isLeaf: true, level: 1}
 	}
+	return &Index{
+		name: t.Name,
+		ids:  ids,
+	}
+}
+
+// Get gets the index of a column with the column name.
+func (i Index) get(c string) *node {
+	return i.ids[c]
 }
 
 // Insert inserts a key into the B-tree, f is the indexed field of a row.
-func (index *Index) Insert(name string, value int32) {
-	var b, p uint8
-	index.tree.insert(key{name: name, value: value, page: p, block: b})
-}
-
-// Search searches a key in the B-tree, f is the indexed field of a row.
-func (index *Index) Search(f Field) int32 {
-	return index.tree.search(string(f))
-}
-
-// CreateIndex creates a new index for a table.
-func (t *Table) CreateIndex(name string) {
-	t.Indexes = append(t.Indexes, *NewIndex(name))
-}
-
-// Index returns the index of a table by name.
-func (t *Table) Index(name string) *Index {
-	for _, i := range t.Indexes {
-		if i.Name == name {
-			return &i
-		}
+// c is the column name of the table.
+// n is the name of the column value.
+// value is the row index.
+func (index *Index) insert(c, n string, value int32) {
+	idx := index.get(c)
+	if idx == nil {
+		return
 	}
-	return nil
+	var b, p uint8
+	idx.insert(key{name: n, value: value, page: p, block: b})
+}
+
+// Search searches a key in the B-tree index, f is the indexed field of a row.
+// If the key is not found, it returns -1, otherwise it returns the row id.
+func (index *Index) search(c string, f Field) int32 {
+	idx := index.get(c)
+	if idx == nil {
+		return -1
+	}
+	return idx.search(string(f))
+}
+
+// CreateIndex creates index for a table.
+func (t *Table) createIndex() {
+	t.index = NewIndex(*t)
 }
