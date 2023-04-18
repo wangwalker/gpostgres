@@ -1,55 +1,112 @@
 package storage
 
+import (
+	"bufio"
+	"encoding/json"
+	"fmt"
+	"os"
+	"time"
+)
+
 // Index is all indexes of a table. As every column could has an index, so
 // we can create multiple indexes for a table with a map, and the key is the
-// column name, value is the index of the column when creating table.
+// column name, value is the btree node of the column, when creating table.
 // So by default, we will create indexes for all columns of a table.
 type Index struct {
-	name string // table name
-	ids  map[string]*node
+	Name    string           `json:"name"` // table name
+	Btrees  map[string]*node `json:"btrees"`
+	writers map[string]*bufio.Writer
+	ticker  *time.Ticker
 }
 
 // NewIndex creates new index for table when creating.
 func NewIndex(t Table) *Index {
-	ids := make(map[string]*node)
+	btrees := make(map[string]*node)
 	for _, c := range t.Columns {
-		ids[string(c.Name)] = &node{isLeaf: true, level: 1}
+		btrees[string(c.Name)] = &node{IsLeaf: true, Level: 1}
 	}
 	return &Index{
-		name: t.Name,
-		ids:  ids,
+		Name:   t.Name,
+		Btrees: btrees,
 	}
+}
+
+// Path returns the path of the index file for a column.
+func (i Index) path(c string) string {
+	dir := fmt.Sprintf("%s/%s", config.IndexDir, i.Name)
+	_, err := os.Stat(dir)
+	if os.IsNotExist(err) {
+		os.Mkdir(dir, 0755)
+	}
+	return fmt.Sprintf("%s/%s/%s.index", config.IndexDir, i.Name, c)
 }
 
 // Get gets the index of a column with the column name.
 func (i Index) get(c string) *node {
-	return i.ids[c]
+	return i.Btrees[c]
 }
 
 // Insert inserts a key into the B-tree, f is the indexed field of a row.
-// c is the column name of the table.
-// n is the name of the column value.
-// value is the row index.
-func (index *Index) insert(c, n string, value uint16) {
-	idx := index.get(c)
-	if idx == nil {
+// c is the column name of the table,n is the name of the column value,
+// p is page index, b is block index, and value is byte offset in block.
+// Note: p, b and value should be calculated when inserting a new row into the
+// avro binary file.
+func (index *Index) insert(c, n string, value, p, b uint16) {
+	btree := index.get(c)
+	if btree == nil {
 		return
 	}
-	var b, p uint16
-	idx.insert(key{name: n, value: value, page: p, block: b})
+	btree.insert(key{Name: n, Value: value, Page: p, Block: b})
+	// update index file
+	path := index.path(c)
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Printf("open index file failed: %v, path: %s", err, path)
+		return
+	}
+	defer f.Close()
+	// TODO: Use effective way to update index file.
+	bytes, err := json.Marshal(index)
+	if err != nil {
+		fmt.Printf("marshal index failed: %v", err)
+		return
+	}
+	w, ok := index.writers[c]
+	if !ok {
+		w = bufio.NewWriter(f)
+		index.writers[c] = w
+	}
+	if _, err := w.Write(bytes); err != nil {
+		fmt.Printf("write index failed: %v", err)
+		return
+	}
 }
 
 // Search searches a key in the B-tree index, f is the indexed field of a row.
 // If the key is not found, it returns -1, otherwise it returns the row id.
 func (index *Index) search(c string, f Field) key {
-	idx := index.get(c)
-	if idx == nil {
+	btree := index.get(c)
+	if btree == nil {
 		return key{}
 	}
-	return idx.search(string(f))
+	return btree.search(string(f))
 }
 
 // CreateIndex creates index for a table.
 func (t *Table) createIndex() {
 	t.index = NewIndex(*t)
+	t.index.writers = make(map[string]*bufio.Writer)
+	// start a ticker to flush index to disk periodically.
+	t.index.ticker = time.NewTicker(time.Second * 5)
+	defer t.index.ticker.Stop()
+	go func() {
+		for range t.index.ticker.C {
+			for _, w := range t.index.writers {
+				if err := w.Flush(); err != nil {
+					fmt.Printf("flush index failed: %v", err)
+					return
+				}
+			}
+		}
+	}()
 }

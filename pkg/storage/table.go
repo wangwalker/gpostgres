@@ -45,6 +45,39 @@ type Table struct {
 	avroCodec   *goavro.Codec
 }
 
+// Convert converts a row for table to  type map[string]interface{}
+// with column name as key and column value as value.
+func (t Table) convert(r Row) map[string]interface{} {
+	record := make(map[string]interface{})
+	for i, c := range t.Columns {
+		name := string(c.Name)
+		var v interface{}
+		if c.Kind == ast.ColumnKindInt {
+			ii, _ := strconv.Atoi(string(r[i]))
+			v = ii
+		} else {
+			v = string(r[i])
+		}
+		record[name] = v
+	}
+	return record
+}
+
+// Get gets the stringed value of a column with the column name, which is
+// used for updating index for the column.
+func get(r map[string]interface{}, name string) string {
+	v, ok := r[name]
+	if !ok {
+		panic(fmt.Sprintf("column %s not found", name))
+	}
+	sv, ok := v.(string)
+	if ok {
+		return sv
+	}
+	return strconv.Itoa(v.(int))
+
+}
+
 // saveScheme saves the scheme of a table to file with json format when created.
 func (t Table) saveScheme() {
 	_, err := os.Stat(config.SchemeDir)
@@ -154,27 +187,13 @@ func (t Table) save(rows []Row) (int, error) {
 		return 0, err
 	}
 	defer f.Close()
+
+	fs, _ := f.Stat()
+	size := fs.Size()
 	// write rows into file with Avro binary format
 	w := bufio.NewWriter(f)
-	for ii, r := range rows {
-		record := make(map[string]interface{})
-		for i, c := range t.Columns {
-			name := string(c.Name)
-			var v interface{}
-			if c.Kind == ast.ColumnKindInt {
-				ii, _ := strconv.Atoi(string(r[i]))
-				v = ii
-			} else {
-				v = string(r[i])
-			}
-			record[name] = v
-			// insert indexes with row index now
-			// TODO: insert indexes with more info with file format later
-			if idx := t.index; idx != nil {
-				v := uint16(len(t.Rows) + ii)
-				idx.insert(name, string(r[i]), v)
-			}
-		}
+	for _, r := range rows {
+		record := t.convert(r)
 		bytes, err := codec.BinaryFromNative(nil, record)
 		bytes = append(bytes, rowSeparator)
 		if err != nil {
@@ -183,6 +202,18 @@ func (t Table) save(rows []Row) (int, error) {
 		_, err = w.Write(bytes)
 		if err != nil {
 			fmt.Printf("Write %v to file failed.\n", bytes)
+		}
+		// update index for all columns
+		// Note: we don't use page and block now, so we set them to 0
+		// TODO: organize row binary data into pages and blocks later
+		for _, c := range t.Columns {
+			if idx := t.index; idx != nil {
+				var p, b uint16
+				c := string(c.Name)
+				n := get(record, c)
+				v := uint16(size) + uint16(len(bytes))
+				idx.insert(c, n, v, p, b)
+			}
 		}
 	}
 	w.Flush()

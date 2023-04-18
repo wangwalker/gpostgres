@@ -13,6 +13,7 @@ func init() {
 		Database:  "testdb",
 		SchemeDir: "./tempstorage/scheme",
 		DataDir:   "./tempstorage/data",
+		IndexDir:  "./tempstorage/index",
 		Mode:      "debug",
 	}
 	config = *c
@@ -20,10 +21,12 @@ func init() {
 	// remove dirs and data if exist
 	os.RemoveAll(config.SchemeDir)
 	os.RemoveAll(config.DataDir)
+	os.RemoveAll(config.IndexDir)
 
 	// create new dirs
 	os.MkdirAll(config.SchemeDir, 0755)
 	os.MkdirAll(config.DataDir, 0755)
+	os.Mkdir(config.IndexDir, 0755)
 }
 
 // TestSaveScheme tests the function saveScheme.
@@ -94,7 +97,7 @@ func TestLoadSchemes(t *testing.T) {
 }
 
 // TestGenerateAvroCodec tests the function generateAvroSchema.
-func TestGenerateAvroCodec(t *testing.T) {
+func TestComposeAvroCodec(t *testing.T) {
 	// GIVEN
 	table := Table{
 		Name: "testuser3",
@@ -221,16 +224,51 @@ func TestSaveRowsAndSearchWithIndex(t *testing.T) {
 	if k := t1.index.get("age"); k == nil {
 		t.Errorf("index is not created")
 	}
-	if k := t1.index.search("name", "wang"); k.value != 0 {
+	if k := t1.index.search("name", "wang"); k.Value == 0 {
 		t.Errorf("index search result is not correct")
 	}
-	if k := t1.index.search("name", "li"); k.value != 1 {
+	if k := t1.index.search("name", "li"); k.Value == 0 {
 		t.Errorf("index search result is not correct")
 	}
-	if k := t1.index.search("name", "zhao"); k.value != 2 {
+	if k := t1.index.search("name", "zhao"); k.Value == 0 {
 		t.Errorf("index search result is not correct")
 	}
-	if k := t1.index.search("name", "qian"); k.value != 3 {
+	if k := t1.index.search("name", "qian"); k.Value == 0 {
 		t.Errorf("index search result is not correct")
+	}
+}
+
+func TestConvertRow(t *testing.T) {
+	// GIVEN
+	t1 := Table{
+		Name: "testuser7",
+		Columns: []ast.Column{
+			{Name: "name", Kind: ast.ColumnKindText},
+			{Name: "age", Kind: ast.ColumnKindInt},
+		},
+	}
+	t1.createIndex()
+	t1.saveScheme()
+
+	// WHEN
+	row := Row{Field("wang"), Field("18")}
+	record := t1.convert(row)
+	name := get(record, "name")
+	age := get(record, "age")
+	// THEN
+	if record == nil {
+		t.Errorf("record should not be nil")
+	}
+	if record["name"] != "wang" {
+		t.Errorf("record field is not correct")
+	}
+	if record["age"] != 18 {
+		t.Errorf("record field is not correct")
+	}
+	if name != "wang" {
+		t.Errorf("record field is not correct")
+	}
+	if age != "18" {
+		t.Errorf("record field is not correct")
 	}
 }

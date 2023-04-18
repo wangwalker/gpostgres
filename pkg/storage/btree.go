@@ -5,11 +5,11 @@ import (
 )
 
 // Using t to represent the half of degree of the B-tree,
-// which means the maximum number of keys in a node is 2t-1.
+// which means the maximum number of Keys in a node is 2t-1.
 const t = 2
 
 // Key is the key of the B-tree. It contains metadata for the btree node,
-// name is used to compare the order of keys, value is used to store other
+// name is used to compare the order of Keys, value is used to store other
 // information, such as the offset or id of the row, page and block is the
 // position of the row in the local binary file.
 // Note: we just put all indexes of one column in one file, so every time
@@ -17,68 +17,68 @@ const t = 2
 // to improve performance, we can update file with buffers, and flush the
 // buffers to disk when the buffer is full.
 type key struct {
-	name  string
-	value uint16
-	page  uint16
-	block uint16
+	Name  string `json:"name"`
+	Value uint16 `json:"value"`
+	Page  uint16 `json:"page"`
+	Block uint16 `json:"block"`
 }
 
 func (k key) lt(other key) bool {
-	return k.name < other.name
+	return k.Name < other.Name
 }
 
 func (k key) isEmpty() bool {
-	return k.name == "" && k.value == 0
+	return k.Name == "" && k.Value == 0
 }
 
 type node struct {
-	keys     []key
-	children []*node
-	isLeaf   bool
-	level    int
+	Keys     []key   `json:"keys"`
+	Children []*node `json:"children"`
+	IsLeaf   bool    `json:"is_leaf"`
+	Level    int     `json:"level"`
 }
 
 // Search key in the B-tree.
 func (tree *node) search(n string) key {
 	i := 0
-	for i < len(tree.keys) && n > tree.keys[i].name {
+	for i < len(tree.Keys) && n > tree.Keys[i].Name {
 		i++
 	}
-	if i < len(tree.keys) && n == tree.keys[i].name {
-		return tree.keys[i]
+	if i < len(tree.Keys) && n == tree.Keys[i].Name {
+		return tree.Keys[i]
 	}
-	if tree.isLeaf {
+	if tree.IsLeaf {
 		return key{}
 	}
-	return tree.children[i].search(n)
+	return tree.Children[i].search(n)
 }
 
 // Insert inserts a key into the B-tree, which is the outer interface.
 func (tree *node) insert(k key) *node {
-	i := len(tree.keys) - 1
-	if tree.isLeaf {
-		tree.keys = append(tree.keys, k)
+	i := len(tree.Keys) - 1
+	if tree.IsLeaf {
+		tree.Keys = append(tree.Keys, k)
 		j := i
-		for ; j >= 0 && k.lt(tree.keys[j]); j-- {
-			tree.keys[j+1] = tree.keys[j]
+		for ; j >= 0 && k.lt(tree.Keys[j]); j-- {
+			tree.Keys[j+1] = tree.Keys[j]
 		}
-		tree.keys[j+1] = k
+		tree.Keys[j+1] = k
 		return tree
 	}
-	for i >= 0 && k.lt(tree.keys[i]) {
+	for i >= 0 && k.lt(tree.Keys[i]) {
 		i--
 	}
 	i++
-	if len(tree.children[i].keys) == 2*t-1 {
-		tree.splitChild(i, tree.children[i])
+	if len(tree.Children[i].Keys) == 2*t-1 {
+		tree.splitChild(i, tree.Children[i])
 		// recalculate the index after split node
-		i = len(tree.keys) - 1
-		for i >= 0 && k.lt(tree.keys[i]) {
+		i = len(tree.Keys) - 1
+		for i >= 0 && k.lt(tree.Keys[i]) {
 			i--
 		}
 		i++
 	}
-	return tree.children[i].insert(k)
+	return tree.Children[i].insert(k)
 }
 
 // Split node when the number of the keys = [2*t-1].
@@ -89,42 +89,42 @@ func (parent *node) splitChild(i int, child *node) {
 	// split original child into two pieces with the middle key,
 	// child1, child2 = child[:t-1], child[t:]
 	var child1, child2 *node
-	level := child.level + 1
-	if child.isLeaf {
+	Level := child.Level + 1
+	if child.IsLeaf {
 		child1 = &node{
-			keys:     child.keys[:t-1],
-			children: nil,
-			isLeaf:   child.isLeaf,
-			level:    level,
+			Keys:     child.Keys[:t-1],
+			Children: nil,
+			IsLeaf:   child.IsLeaf,
+			Level:    Level,
 		}
 		child2 = &node{
-			keys:     child.keys[t:],
-			children: nil,
-			isLeaf:   child.isLeaf,
-			level:    level,
+			Keys:     child.Keys[t:],
+			Children: nil,
+			IsLeaf:   child.IsLeaf,
+			Level:    Level,
 		}
 	} else {
 		child1 = &node{
-			keys:     child.keys[:t-1],
-			children: child.children[:t-1],
-			isLeaf:   child.isLeaf,
-			level:    level,
+			Keys:     child.Keys[:t-1],
+			Children: child.Children[:t-1],
+			IsLeaf:   child.IsLeaf,
+			Level:    Level,
 		}
 		child2 = &node{
-			keys:     child.keys[t:],
-			children: child.children[t:],
-			isLeaf:   child.isLeaf,
-			level:    level,
+			Keys:     child.Keys[t:],
+			Children: child.Children[t:],
+			IsLeaf:   child.IsLeaf,
+			Level:    Level,
 		}
 	}
 
 	subParent := &node{
-		keys:     []key{child.keys[t-1]},
-		children: []*node{child1, child2},
-		isLeaf:   false,
-		level:    child.level,
+		Keys:     []key{child.Keys[t-1]},
+		Children: []*node{child1, child2},
+		IsLeaf:   false,
+		Level:    child.Level,
 	}
-	parent.children[i] = subParent
+	parent.Children[i] = subParent
 	parent.merge(subParent, i)
 }
 
@@ -132,43 +132,43 @@ func (parent *node) splitChild(i int, child *node) {
 // Child node is the new node after spliting, so it has just one key and two children.
 // It should be called after splitChild to balance tree.
 func (parent *node) merge(child *node, i int) {
-	if len(parent.keys) == 2*t-1 {
+	if len(parent.Keys) == 2*t-1 {
 		return
 	}
 	if i == 0 {
-		parent.keys = append(child.keys, parent.keys...)
-		parent.children = append(child.children, parent.children[1:]...)
-	} else if len(parent.keys) > i {
-		// split parent's keys into two pieces, the middle one will be the only key at child node
-		k1, k2 := parent.keys[:i], parent.keys[i:]
-		keys := make([]key, 0, len(k1)+len(k2)+1)
-		keys = append(keys, k1...)
-		keys = append(keys, child.keys[0])
-		keys = append(keys, k2...)
-		parent.keys = keys
+		parent.Keys = append(child.Keys, parent.Keys...)
+		parent.Children = append(child.Children, parent.Children[1:]...)
+	} else if len(parent.Keys) > i {
+		// split parent's Keys into two pieces, the middle one will be the only key at child node
+		k1, k2 := parent.Keys[:i], parent.Keys[i:]
+		Keys := make([]key, 0, len(k1)+len(k2)+1)
+		Keys = append(Keys, k1...)
+		Keys = append(Keys, child.Keys[0])
+		Keys = append(Keys, k2...)
+		parent.Keys = Keys
 		// split parent children into two pieces, will ignore the middle one
-		c1, c2 := parent.children[:i], parent.children[i+1:]
-		children := make([]*node, 0, len(c1)+len(c2)+1)
-		children = append(children, c1...)
-		children = append(children, child.children...)
-		children = append(children, c2...)
-		parent.children = children
+		c1, c2 := parent.Children[:i], parent.Children[i+1:]
+		Children := make([]*node, 0, len(c1)+len(c2)+1)
+		Children = append(Children, c1...)
+		Children = append(Children, child.Children...)
+		Children = append(Children, c2...)
+		parent.Children = Children
 	} else {
 		// just append the key and children of child node to parent
-		parent.keys = append(parent.keys, child.keys[0])
-		parent.children = append(parent.children[:i], child.children...)
+		parent.Keys = append(parent.Keys, child.Keys[0])
+		parent.Children = append(parent.Children[:i], child.Children...)
 	}
-	// update level of children
-	for _, c := range parent.children {
-		c.level = parent.level + 1
+	// update Level of children
+	for _, c := range parent.Children {
+		c.Level = parent.Level + 1
 	}
 }
 
 func traverse(tree *node) {
-	fmt.Printf("level = %d, keys = %+v\n", tree.level, tree.keys)
-	for i := range tree.children {
-		if !tree.isLeaf && tree.children[i] != nil {
-			traverse(tree.children[i])
+	fmt.Printf("level = %d, keys = %+v\n", tree.Level, tree.Keys)
+	for i := range tree.Children {
+		if !tree.IsLeaf && tree.Children[i] != nil {
+			traverse(tree.Children[i])
 		}
 	}
 }

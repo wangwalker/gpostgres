@@ -20,13 +20,13 @@ func TestKeyLt(t *testing.T) {
 func TestStringBtree(t *testing.T) {
 	// GIVEN
 	root := &node{
-		keys: []key{{"e", 0, 0, 0}, {"k", 30, 0, 0}},
-		children: []*node{
-			{keys: []key{{"a", 1, 0, 0}, {"b", 2, 0, 0}, {"k", 3, 0, 0}}, isLeaf: true, level: 2},
-			{keys: []key{{"fd", 4, 0, 0}, {"gd", 5, 0, 0}, {"h2", 6, 0, 0}}, isLeaf: true, level: 2},
-			{keys: []key{{"m1", 7, 0, 0}, {"m2", 8, 0, 0}, {"root", 9, 0, 0}}, isLeaf: true, level: 2}},
-		isLeaf: false,
-		level:  1,
+		Keys: []key{{"e", 0, 0, 0}, {"k", 30, 0, 0}},
+		Children: []*node{
+			{Keys: []key{{"a", 1, 0, 0}, {"b", 2, 0, 0}, {"k", 3, 0, 0}}, IsLeaf: true, Level: 2},
+			{Keys: []key{{"fd", 4, 0, 0}, {"gd", 5, 0, 0}, {"h2", 6, 0, 0}}, IsLeaf: true, Level: 2},
+			{Keys: []key{{"m1", 7, 0, 0}, {"m2", 8, 0, 0}, {"root", 9, 0, 0}}, IsLeaf: true, Level: 2}},
+		IsLeaf: false,
+		Level:  1,
 	}
 	t.Log("traversing the tree before insertion")
 	traverse(root)
@@ -43,31 +43,31 @@ func TestStringBtree(t *testing.T) {
 	root.insert(key{"string", 18, 0, 0})
 
 	// THEN
-	t.Log("traversing the tree after inserting 9 keys")
+	t.Log("traversing the tree after inserting 9 Keys")
 	traverse(root)
 
-	if len(root.keys) != 3 {
-		t.Errorf("root should have 3 keys, but got %d", len(root.keys))
+	if len(root.Keys) != 3 {
+		t.Errorf("root should have 3 Keys, but got %d", len(root.Keys))
 	}
-	if len(root.children) != 4 {
-		t.Errorf("root should have 4 children, but got %d", len(root.children))
+	if len(root.Children) != 4 {
+		t.Errorf("root should have 4 Children, but got %d", len(root.Children))
 	}
-	if k := root.search("food"); k.value != 10 {
+	if k := root.search("food"); k.Value != 10 {
 		t.Error("food should be found")
 	}
-	if k := root.search("kitty"); k.value != 15 {
+	if k := root.search("kitty"); k.Value != 15 {
 		t.Error("kitty should be found")
 	}
-	if k := root.search("internet"); k.value != 13 {
+	if k := root.search("internet"); k.Value != 13 {
 		t.Error("internet should be found")
 	}
-	if k := root.search("string"); k.value != 18 {
+	if k := root.search("string"); k.Value != 18 {
 		t.Error("string should be found")
 	}
-	if k := root.search("loop"); k.value != 16 {
+	if k := root.search("loop"); k.Value != 16 {
 		t.Error("loop should be found")
 	}
-	if k := root.search("hi"); k.value != 12 {
+	if k := root.search("hi"); k.Value != 12 {
 		t.Error("hi should be found")
 	}
 	if k := root.search("f"); !k.isEmpty() {

@@ -1,13 +1,14 @@
 package storage
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/wangwalker/gpostgres/pkg/ast"
 )
 
 // Tests CreateIndex
-func TestCreateIndex(t *testing.T) {
+func TestCreateIndexNode(t *testing.T) {
 	// GIVEN
 	t1 := Table{
 		Name: "testindex1",
@@ -21,10 +22,10 @@ func TestCreateIndex(t *testing.T) {
 	t1.createIndex()
 
 	// THEN
-	if len(t1.index.ids) != 2 {
+	if len(t1.index.Btrees) != 2 {
 		t.Errorf("table indexes is not correct")
 	}
-	if t1.index.name != "testindex1" {
+	if t1.index.Name != "testindex1" {
 		t.Errorf("table index name is not correct")
 	}
 	if n1 := t1.index.get("name"); n1 == nil {
@@ -35,8 +36,7 @@ func TestCreateIndex(t *testing.T) {
 	}
 }
 
-// Tests Index.Insert
-func TestIndexInsertAndSearchName(t *testing.T) {
+func TestCreateIndexPath(t *testing.T) {
 	// GIVEN
 	t1 := Table{
 		Name: "testindex2",
@@ -45,36 +45,22 @@ func TestIndexInsertAndSearchName(t *testing.T) {
 			{Name: "age", Kind: ast.ColumnKindInt},
 		},
 	}
-	t1.createIndex()
 
 	// WHEN
-	r := make([]Field, 0, 8)
-	r = append(r, "wang", "18")
-	r = append(r, "li", "32")
-	r = append(r, "zhao", "28")
-	r = append(r, "qian", "26")
-	t1.Rows = append(t1.Rows, r)
-	t1.index.insert("name", "wang", 1)
-	t1.index.insert("name", "li", 2)
-	t1.index.insert("name", "zhao", 3)
-	t1.index.insert("name", "qian", 4)
+	t1.createIndex()
 
 	// THEN
-	if v := t1.index.search("name", "wang"); v.value != 1 {
-		t.Errorf("table index value is not correct")
-	}
-	if v := t1.index.search("name", "li"); v.value != 2 {
-		t.Errorf("table index value is not correct")
-	}
-	if v := t1.index.search("name", "zhao"); v.value != 3 {
-		t.Errorf("table index value is not correct")
-	}
-	if v := t1.index.search("name", "qian"); v.value != 4 {
-		t.Errorf("table index value is not correct")
+	for _, c := range t1.Columns {
+		path1 := t1.index.path(string(c.Name))
+		path2 := fmt.Sprintf("%s/%s/%s.index", config.IndexDir, t1.Name, c.Name)
+		if path1 != path2 {
+			t.Errorf("table index path is not correct")
+		}
 	}
 }
 
-func TestIndexInsertAndSearchAge(t *testing.T) {
+// Tests Index.Insert
+func TestIndexInsertAndSearchName(t *testing.T) {
 	// GIVEN
 	t1 := Table{
 		Name: "testindex3",
@@ -92,22 +78,60 @@ func TestIndexInsertAndSearchAge(t *testing.T) {
 	r = append(r, "zhao", "28")
 	r = append(r, "qian", "26")
 	t1.Rows = append(t1.Rows, r)
-	t1.index.insert("age", "wang", 1)
-	t1.index.insert("age", "li", 2)
-	t1.index.insert("age", "zhao", 3)
-	t1.index.insert("age", "qian", 4)
+	t1.index.insert("name", "wang", 1, 0, 0)
+	t1.index.insert("name", "li", 2, 0, 0)
+	t1.index.insert("name", "zhao", 3, 0, 0)
+	t1.index.insert("name", "qian", 4, 0, 0)
 
 	// THEN
-	if v := t1.index.search("age", "wang"); v.value != 1 {
+	if v := t1.index.search("name", "wang"); v.Value != 1 {
 		t.Errorf("table index value is not correct")
 	}
-	if v := t1.index.search("age", "li"); v.value != 2 {
+	if v := t1.index.search("name", "li"); v.Value != 2 {
 		t.Errorf("table index value is not correct")
 	}
-	if v := t1.index.search("age", "zhao"); v.value != 3 {
+	if v := t1.index.search("name", "zhao"); v.Value != 3 {
 		t.Errorf("table index value is not correct")
 	}
-	if v := t1.index.search("age", "qian"); v.value != 4 {
+	if v := t1.index.search("name", "qian"); v.Value != 4 {
+		t.Errorf("table index value is not correct")
+	}
+}
+
+func TestIndexInsertAndSearchAge(t *testing.T) {
+	// GIVEN
+	t1 := Table{
+		Name: "testindex4",
+		Columns: []ast.Column{
+			{Name: "name", Kind: ast.ColumnKindText},
+			{Name: "age", Kind: ast.ColumnKindInt},
+		},
+	}
+	t1.createIndex()
+
+	// WHEN
+	r := make([]Field, 0, 8)
+	r = append(r, "wang", "18")
+	r = append(r, "li", "32")
+	r = append(r, "zhao", "28")
+	r = append(r, "qian", "26")
+	t1.Rows = append(t1.Rows, r)
+	t1.index.insert("age", "wang", 1, 0, 0)
+	t1.index.insert("age", "li", 2, 0, 0)
+	t1.index.insert("age", "zhao", 3, 0, 0)
+	t1.index.insert("age", "qian", 4, 0, 0)
+
+	// THEN
+	if v := t1.index.search("age", "wang"); v.Value != 1 {
+		t.Errorf("table index value is not correct")
+	}
+	if v := t1.index.search("age", "li"); v.Value != 2 {
+		t.Errorf("table index value is not correct")
+	}
+	if v := t1.index.search("age", "zhao"); v.Value != 3 {
+		t.Errorf("table index value is not correct")
+	}
+	if v := t1.index.search("age", "qian"); v.Value != 4 {
 		t.Errorf("table index value is not correct")
 	}
 }
