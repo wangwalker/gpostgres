@@ -214,23 +214,23 @@ func TestSaveRowsAndSearchWithIndex(t *testing.T) {
 	if err != nil {
 		t.Errorf("failed to save rows: %s", err)
 	}
-	if idx := t1.index.get("name"); idx == nil {
+	if k := t1.index.get("name"); k == nil {
 		t.Errorf("index is not created")
 	}
 	// Now the index value is just the row index
-	if idx := t1.index.get("age"); idx == nil {
+	if k := t1.index.get("age"); k == nil {
 		t.Errorf("index is not created")
 	}
-	if idx := t1.index.search("name", "wang"); idx != 0 {
+	if k := t1.index.search("name", "wang"); k.value != 0 {
 		t.Errorf("index search result is not correct")
 	}
-	if idx := t1.index.search("name", "li"); idx != 1 {
+	if k := t1.index.search("name", "li"); k.value != 1 {
 		t.Errorf("index search result is not correct")
 	}
-	if idx := t1.index.search("name", "zhao"); idx != 2 {
+	if k := t1.index.search("name", "zhao"); k.value != 2 {
 		t.Errorf("index search result is not correct")
 	}
-	if idx := t1.index.search("name", "qian"); idx != 3 {
+	if k := t1.index.search("name", "qian"); k.value != 3 {
 		t.Errorf("index search result is not correct")
 	}
 }

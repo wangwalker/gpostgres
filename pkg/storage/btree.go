@@ -8,18 +8,27 @@ import (
 // which means the maximum number of keys in a node is 2t-1.
 const t = 2
 
-// key is the key of the B-tree. It contains metadata for the btree node,
-// name is used to compare the order of keys, value is used to store other information,
-// such as the offset or id of the row.
+// Key is the key of the B-tree. It contains metadata for the btree node,
+// name is used to compare the order of keys, value is used to store other
+// information, such as the offset or id of the row, page and block is the
+// position of the row in the local binary file.
+// Note: we just put all indexes of one column in one file, so every time
+// inserting a new row, we need to update index file of the column. In order
+// to improve performance, we can update file with buffers, and flush the
+// buffers to disk when the buffer is full.
 type key struct {
 	name  string
-	value int32
-	page  uint8
-	block uint8
+	value uint16
+	page  uint16
+	block uint16
 }
 
 func (k key) lt(other key) bool {
 	return k.name < other.name
+}
+
+func (k key) isEmpty() bool {
+	return k.name == "" && k.value == 0
 }
 
 type node struct {
@@ -30,18 +39,18 @@ type node struct {
 }
 
 // Search key in the B-tree.
-func (tree *node) search(k string) int32 {
+func (tree *node) search(n string) key {
 	i := 0
-	for i < len(tree.keys) && k > tree.keys[i].name {
+	for i < len(tree.keys) && n > tree.keys[i].name {
 		i++
 	}
-	if i < len(tree.keys) && k == tree.keys[i].name {
-		return tree.keys[i].value
+	if i < len(tree.keys) && n == tree.keys[i].name {
+		return tree.keys[i]
 	}
 	if tree.isLeaf {
-		return -1
+		return key{}
 	}
-	return tree.children[i].search(k)
+	return tree.children[i].search(n)
 }
 
 // Insert inserts a key into the B-tree, which is the outer interface.

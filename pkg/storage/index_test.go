@@ -60,16 +60,16 @@ func TestIndexInsertAndSearchName(t *testing.T) {
 	t1.index.insert("name", "qian", 4)
 
 	// THEN
-	if v := t1.index.search("name", "wang"); v != 1 {
+	if v := t1.index.search("name", "wang"); v.value != 1 {
 		t.Errorf("table index value is not correct")
 	}
-	if v := t1.index.search("name", "li"); v != 2 {
+	if v := t1.index.search("name", "li"); v.value != 2 {
 		t.Errorf("table index value is not correct")
 	}
-	if v := t1.index.search("name", "zhao"); v != 3 {
+	if v := t1.index.search("name", "zhao"); v.value != 3 {
 		t.Errorf("table index value is not correct")
 	}
-	if v := t1.index.search("name", "qian"); v != 4 {
+	if v := t1.index.search("name", "qian"); v.value != 4 {
 		t.Errorf("table index value is not correct")
 	}
 }
@@ -98,16 +98,16 @@ func TestIndexInsertAndSearchAge(t *testing.T) {
 	t1.index.insert("age", "qian", 4)
 
 	// THEN
-	if v := t1.index.search("age", "wang"); v != 1 {
+	if v := t1.index.search("age", "wang"); v.value != 1 {
 		t.Errorf("table index value is not correct")
 	}
-	if v := t1.index.search("age", "li"); v != 2 {
+	if v := t1.index.search("age", "li"); v.value != 2 {
 		t.Errorf("table index value is not correct")
 	}
-	if v := t1.index.search("age", "zhao"); v != 3 {
+	if v := t1.index.search("age", "zhao"); v.value != 3 {
 		t.Errorf("table index value is not correct")
 	}
-	if v := t1.index.search("age", "qian"); v != 4 {
+	if v := t1.index.search("age", "qian"); v.value != 4 {
 		t.Errorf("table index value is not correct")
 	}
 }

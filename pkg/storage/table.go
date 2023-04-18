@@ -171,7 +171,7 @@ func (t Table) save(rows []Row) (int, error) {
 			// insert indexes with row index now
 			// TODO: insert indexes with more info with file format later
 			if idx := t.index; idx != nil {
-				v := int32(len(t.Rows) + ii)
+				v := uint16(len(t.Rows) + ii)
 				idx.insert(name, string(r[i]), v)
 			}
 		}

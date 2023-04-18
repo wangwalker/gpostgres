@@ -22,7 +22,7 @@ func TestStringBtree(t *testing.T) {
 	root := &node{
 		keys: []key{{"e", 0, 0, 0}, {"k", 30, 0, 0}},
 		children: []*node{
-			{keys: []key{{"a", 1, 0, 0}, {"b", 2, 0, 0}, {"v", 3, 0, 0}}, isLeaf: true, level: 2},
+			{keys: []key{{"a", 1, 0, 0}, {"b", 2, 0, 0}, {"k", 3, 0, 0}}, isLeaf: true, level: 2},
 			{keys: []key{{"fd", 4, 0, 0}, {"gd", 5, 0, 0}, {"h2", 6, 0, 0}}, isLeaf: true, level: 2},
 			{keys: []key{{"m1", 7, 0, 0}, {"m2", 8, 0, 0}, {"root", 9, 0, 0}}, isLeaf: true, level: 2}},
 		isLeaf: false,
@@ -43,7 +43,7 @@ func TestStringBtree(t *testing.T) {
 	root.insert(key{"string", 18, 0, 0})
 
 	// THEN
-	t.Log("traversing the tree after inserting food, godd, hi, internet, j, kitty, loop, moon, string")
+	t.Log("traversing the tree after inserting 9 keys")
 	traverse(root)
 
 	if len(root.keys) != 3 {
@@ -52,28 +52,28 @@ func TestStringBtree(t *testing.T) {
 	if len(root.children) != 4 {
 		t.Errorf("root should have 4 children, but got %d", len(root.children))
 	}
-	if v := root.search("food"); v != 10 {
+	if k := root.search("food"); k.value != 10 {
 		t.Error("food should be found")
 	}
-	if v := root.search("kitty"); v != 15 {
+	if k := root.search("kitty"); k.value != 15 {
 		t.Error("kitty should be found")
 	}
-	if v := root.search("internet"); v != 13 {
+	if k := root.search("internet"); k.value != 13 {
 		t.Error("internet should be found")
 	}
-	if v := root.search("string"); v != 18 {
+	if k := root.search("string"); k.value != 18 {
 		t.Error("string should be found")
 	}
-	if v := root.search("loop"); v != 16 {
+	if k := root.search("loop"); k.value != 16 {
 		t.Error("loop should be found")
 	}
-	if v := root.search("hi"); v != 12 {
+	if k := root.search("hi"); k.value != 12 {
 		t.Error("hi should be found")
 	}
-	if v := root.search("f"); v != -1 {
+	if k := root.search("f"); !k.isEmpty() {
 		t.Error("f should not be found")
 	}
-	if v := root.search("z"); v != -1 {
+	if k := root.search("z"); !k.isEmpty() {
 		t.Error("z should not be found")
 	}
 }

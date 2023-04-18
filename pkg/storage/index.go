@@ -30,21 +30,21 @@ func (i Index) get(c string) *node {
 // c is the column name of the table.
 // n is the name of the column value.
 // value is the row index.
-func (index *Index) insert(c, n string, value int32) {
+func (index *Index) insert(c, n string, value uint16) {
 	idx := index.get(c)
 	if idx == nil {
 		return
 	}
-	var b, p uint8
+	var b, p uint16
 	idx.insert(key{name: n, value: value, page: p, block: b})
 }
 
 // Search searches a key in the B-tree index, f is the indexed field of a row.
 // If the key is not found, it returns -1, otherwise it returns the row id.
-func (index *Index) search(c string, f Field) int32 {
+func (index *Index) search(c string, f Field) key {
 	idx := index.get(c)
 	if idx == nil {
-		return -1
+		return key{}
 	}
 	return idx.search(string(f))
 }
