@@ -136,6 +136,7 @@ func loadScheme(name string) {
 		fmt.Printf("Failed to decode json file %s: %s", path, err)
 		return
 	}
+	table.loadIndex()
 	tables[table.Name] = table
 }
 
@@ -215,7 +216,6 @@ func (t Table) save(rows []Row) (int, error) {
 				var p, b uint16
 				c := string(c.Name)
 				n := get(record, c)
-
 				idx.insert(c, n, v, p, b)
 			}
 		}
@@ -317,9 +317,11 @@ func (t *Table) setColumnNames() {
 
 func NewTable(stmt ast.QueryStmtCreateTable) *Table {
 	rows := make([]Row, 0, tableRowDefaultCount)
-	return &Table{
+	t := &Table{
 		Name:    stmt.Name,
 		Columns: stmt.Columns,
 		Rows:    rows,
 	}
+	t.createIndex()
+	return t
 }

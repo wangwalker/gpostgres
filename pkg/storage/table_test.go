@@ -94,6 +94,9 @@ func TestLoadSchemes(t *testing.T) {
 	if t2.Columns[1].Kind != ast.ColumnKindInt {
 		t.Errorf("table column kind is not correct")
 	}
+	if t2.index == nil {
+		t.Errorf("table index is nil")
+	}
 }
 
 // TestGenerateAvroCodec tests the function generateAvroSchema.
@@ -276,5 +279,50 @@ func TestConvertRow(t *testing.T) {
 	}
 	if age != "18" {
 		t.Errorf("record field is not correct")
+	}
+}
+
+// TestLoadSchemes tests the function loadSchemes.
+func TestLoadSchemesAndSaveRow(t *testing.T) {
+	// GIVEN
+	t1 := Table{
+		Name: "testuser8",
+		Columns: []ast.Column{
+			{Name: "name", Kind: ast.ColumnKindText},
+			{Name: "age", Kind: ast.ColumnKindInt},
+		},
+	}
+	t1.createIndex()
+	t1.saveScheme()
+
+	rows := make([]Row, 0, 2)
+	r1 := Row{Field("wang"), Field("18")}
+	r2 := Row{Field("li"), Field("20")}
+	rows = append(rows, r1, r2)
+	// will update index when save rows
+	t1.save(rows)
+
+	// WHEN
+	loadSchemes()
+
+	// THEN
+	t2, ok := tables["testuser8"]
+	if !ok {
+		t.Errorf("table testuser8 is not loaded")
+	}
+	if t2.index == nil {
+		t.Errorf("table index is nil")
+	}
+	if t2.index.get("name") == nil {
+		t.Errorf("table index is not loaded")
+	}
+	if t2.index.get("age") == nil {
+		t.Errorf("table index is not loaded")
+	}
+	if t2.index.get("name").Keys == nil {
+		t.Errorf("table name index should not be nil")
+	}
+	if t2.index.get("age").Keys == nil {
+		t.Errorf("table age index should not be nil")
 	}
 }

@@ -36,7 +36,7 @@ func (i Index) path(c string) string {
 	dir := fmt.Sprintf("%s/%s", config.IndexDir, i.Name)
 	_, err := os.Stat(dir)
 	if os.IsNotExist(err) {
-		os.Mkdir(dir, 0755)
+		os.MkdirAll(dir, 0755)
 	}
 	return fmt.Sprintf("%s/%s/%s.index", config.IndexDir, i.Name, c)
 }
@@ -71,7 +71,7 @@ func (index *Index) insert(c, n string, value, p, b uint16) {
 		return
 	}
 	// TODO: Use effective way to update index file.
-	bytes, err := json.Marshal(index)
+	bytes, err := json.Marshal(index.Btrees[c])
 	if err != nil {
 		fmt.Printf("marshal index failed: %v\n", err)
 		return
@@ -105,7 +105,7 @@ func (t *Table) createIndex() {
 	go func() {
 		for range t.index.ticker.C {
 			for _, w := range t.index.writers {
-				// TODO: reopen file as it has been closed by defer in insert.
+				// TODO: reopen file as it has been closed by defer when insert.
 				if err := w.Flush(); err != nil {
 					fmt.Printf("flush index failed: %v\n", err)
 					return
@@ -113,4 +113,26 @@ func (t *Table) createIndex() {
 			}
 		}
 	}()
+}
+
+// LoadIndex loads index from disk.
+func (t *Table) loadIndex() {
+	// create index for table, now index is empty.
+	t.createIndex()
+	// load index data from disk.
+	for _, c := range t.Columns {
+		path := t.index.path(string(c.Name))
+		f, err := os.Open(path)
+		if err != nil && os.IsNotExist(err) {
+			return
+		}
+		defer f.Close()
+
+		var btree node
+		if err := json.NewDecoder(f).Decode(&btree); err != nil {
+			fmt.Printf("decode index failed: %v\n", err)
+			return
+		}
+		t.index.Btrees[string(c.Name)] = &btree
+	}
 }
