@@ -182,14 +182,16 @@ func (t Table) save(rows []Row) (int, error) {
 		return 0, err
 	}
 	f, err := os.OpenFile(t.dataPath(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	fs, _ := f.Stat()
+	size := fs.Size()
 	if err != nil {
 		fmt.Println(err)
 		return 0, err
 	}
 	defer f.Close()
 
-	fs, _ := f.Stat()
-	size := fs.Size()
+	// accumulated size of rows inserted in this call
+	var size1 uint16
 	// write rows into file with Avro binary format
 	w := bufio.NewWriter(f)
 	for _, r := range rows {
@@ -206,12 +208,14 @@ func (t Table) save(rows []Row) (int, error) {
 		// update index for all columns
 		// Note: we don't use page and block now, so we set them to 0
 		// TODO: organize row binary data into pages and blocks later
+		size1 += uint16(len(bytes))
+		v := uint16(size) + size1
 		for _, c := range t.Columns {
 			if idx := t.index; idx != nil {
 				var p, b uint16
 				c := string(c.Name)
 				n := get(record, c)
-				v := uint16(size) + uint16(len(bytes))
+
 				idx.insert(c, n, v, p, b)
 			}
 		}

@@ -59,26 +59,30 @@ func (index *Index) insert(c, n string, value, p, b uint16) {
 	btree.insert(key{Name: n, Value: value, Page: p, Block: b})
 	// update index file
 	path := index.path(c)
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
-		fmt.Printf("open index file failed: %v, path: %s", err, path)
+		fmt.Printf("open index file failed: %v, path: %s\n", err, path)
 		return
 	}
 	defer f.Close()
+	// Truncate original content of the index file.
+	if err := f.Truncate(0); err != nil {
+		fmt.Printf("truncate index file failed: %v, path: %s\n", err, path)
+		return
+	}
 	// TODO: Use effective way to update index file.
 	bytes, err := json.Marshal(index)
 	if err != nil {
-		fmt.Printf("marshal index failed: %v", err)
+		fmt.Printf("marshal index failed: %v\n", err)
 		return
 	}
-	w, ok := index.writers[c]
-	if !ok {
-		w = bufio.NewWriter(f)
-		index.writers[c] = w
-	}
+	w := bufio.NewWriter(f)
 	if _, err := w.Write(bytes); err != nil {
-		fmt.Printf("write index failed: %v", err)
+		fmt.Printf("write index failed: %v\n", err)
 		return
+	}
+	if err := w.Flush(); err != nil {
+		fmt.Printf("flush index failed: %v\n", err)
 	}
 }
 
@@ -95,15 +99,15 @@ func (index *Index) search(c string, f Field) key {
 // CreateIndex creates index for a table.
 func (t *Table) createIndex() {
 	t.index = NewIndex(*t)
-	t.index.writers = make(map[string]*bufio.Writer)
 	// start a ticker to flush index to disk periodically.
 	t.index.ticker = time.NewTicker(time.Second * 5)
 	defer t.index.ticker.Stop()
 	go func() {
 		for range t.index.ticker.C {
 			for _, w := range t.index.writers {
+				// TODO: reopen file as it has been closed by defer in insert.
 				if err := w.Flush(); err != nil {
-					fmt.Printf("flush index failed: %v", err)
+					fmt.Printf("flush index failed: %v\n", err)
 					return
 				}
 			}
