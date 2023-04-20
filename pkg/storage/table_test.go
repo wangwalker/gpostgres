@@ -229,20 +229,20 @@ func TestSaveRowsAndSearchWithIndex(t *testing.T) {
 	}
 	var k key
 	var v uint16
-	// k.Value should increase by the order of the rows
-	if k = t1.index.search("name", "wang"); k.Value < v {
+	// k.Offset should increase by the order of the rows
+	if k = t1.index.search("name", "wang"); k.Offset < v {
 		t.Errorf("index search result is not correct")
 	}
-	v = k.Value
-	if k = t1.index.search("name", "li"); k.Value < v {
+	v = k.Offset
+	if k = t1.index.search("name", "li"); k.Offset < v {
 		t.Errorf("index search result is not correct")
 	}
-	v = k.Value
-	if k = t1.index.search("name", "zhao"); k.Value < v {
+	v = k.Offset
+	if k = t1.index.search("name", "zhao"); k.Offset < v {
 		t.Errorf("index search result is not correct")
 	}
-	v = k.Value
-	if k = t1.index.search("name", "qian"); k.Value < v {
+	v = k.Offset
+	if k = t1.index.search("name", "qian"); k.Offset < v {
 		t.Errorf("index search result is not correct")
 	}
 }
@@ -324,5 +324,61 @@ func TestLoadSchemesAndSaveRow(t *testing.T) {
 	}
 	if t2.index.get("age").Keys == nil {
 		t.Errorf("table age index should not be nil")
+	}
+}
+
+func TestSearchWithIndex(t *testing.T) {
+	// GIVEN
+	t1 := Table{
+		Name: "testuser9",
+		Columns: []ast.Column{
+			{Name: "name", Kind: ast.ColumnKindText},
+			{Name: "age", Kind: ast.ColumnKindInt},
+		},
+	}
+	t1.createIndex()
+	t1.saveScheme()
+
+	rows := make([]Row, 0, 2)
+	r1 := Row{Field("wang"), Field("18")}
+	r2 := Row{Field("li"), Field("20")}
+	rows = append(rows, r1, r2)
+	// will update index when save rows
+	t1.save(rows)
+
+	// WHEN
+	r11, err1 := t1.search(ast.ColumnName("name"), Field("wang"))
+	r22, err2 := t1.search(ast.ColumnName("name"), Field("li"))
+
+	// THEN
+	if err1 != nil {
+		t.Errorf("failed to search row: %s\n", err1)
+	}
+	if err2 != nil {
+		t.Errorf("failed to search row: %s\n", err2)
+	}
+	if r11 == nil {
+		t.Errorf("search result should not be nil")
+	}
+	if r22 == nil {
+		t.Errorf("search result should not be nil")
+	}
+	if len(r1) != len(r11) {
+		t.Errorf("search result is not correct")
+	}
+	if len(r2) != len(r22) {
+		t.Errorf("search result is not correct")
+	}
+	if r1[0] != r11[0] {
+		t.Errorf("search result is not correct")
+	}
+	if r1[1] != r11[1] {
+		t.Errorf("search result is not correct")
+	}
+	if r2[0] != r22[0] {
+		t.Errorf("search result is not correct")
+	}
+	if r2[1] != r22[1] {
+		t.Errorf("search result is not correct")
 	}
 }

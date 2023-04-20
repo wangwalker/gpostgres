@@ -13,8 +13,8 @@ import (
 // column name, value is the btree node of the column, when creating table.
 // So by default, we will create indexes for all columns of a table.
 type Index struct {
-	Name    string           `json:"name"` // table name
-	Btrees  map[string]*node `json:"btrees"`
+	Name    string           `json:"n"` // table name
+	Btrees  map[string]*node `json:"b"`
 	writers map[string]*bufio.Writer
 	ticker  *time.Ticker
 }
@@ -48,15 +48,15 @@ func (i Index) get(c string) *node {
 
 // Insert inserts a key into the B-tree, f is the indexed field of a row.
 // c is the column name of the table,n is the name of the column value,
-// p is page index, b is block index, and value is byte offset in block.
-// Note: p, b and value should be calculated when inserting a new row into the
-// avro binary file.
-func (index *Index) insert(c, n string, value, p, b uint16) {
+// p is page index, b is block index, and offset is byte offset in block.
+// Note: p, b, offset and length should be calculated when inserting a new
+// row into the avro binary file.
+func (index *Index) insert(c, n string, offset, length, p, b uint16) {
 	btree := index.get(c)
 	if btree == nil {
 		return
 	}
-	btree.insert(key{Name: n, Value: value, Page: p, Block: b})
+	btree.insert(key{Name: n, Offset: offset, Length: length, Page: p, Block: b})
 	// update index file
 	path := index.path(c)
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)

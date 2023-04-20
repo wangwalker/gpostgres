@@ -20,8 +20,9 @@ const (
 )
 
 var (
-	errConvertIntFailed  = errors.New("failed to convert binary to int")
-	errConvertTextFailed = errors.New("failed to convert binary to text")
+	errConvertIntFailed    = errors.New("failed to convert binary to int")
+	errConvertTextFailed   = errors.New("failed to convert binary to text")
+	errConvertRecordFailed = errors.New("failed to convert binary to record")
 )
 
 type Field string
@@ -46,7 +47,8 @@ type Table struct {
 }
 
 // Convert converts a row for table to  type map[string]interface{}
-// with column name as key and column value as value.
+// with column name as key and column value as value, which is used
+// for encoding to avro binary in save(row) method.
 func (t Table) convert(r Row) map[string]interface{} {
 	record := make(map[string]interface{})
 	for i, c := range t.Columns {
@@ -65,6 +67,7 @@ func (t Table) convert(r Row) map[string]interface{} {
 
 // Get gets the stringed value of a column with the column name, which is
 // used for updating index for the column.
+// The parameter r is the result of call convert(row) method.
 func get(r map[string]interface{}, name string) string {
 	v, ok := r[name]
 	if !ok {
@@ -78,7 +81,7 @@ func get(r map[string]interface{}, name string) string {
 
 }
 
-// saveScheme saves the scheme of a table to file with json format when created.
+// SaveScheme saves table scheme to file with json format when creating one.
 func (t Table) saveScheme() {
 	_, err := os.Stat(config.SchemeDir)
 	if os.IsNotExist(err) {
@@ -150,9 +153,11 @@ func (t Table) composeAvroCodec() (*goavro.Codec, error) {
 	var fields strings.Builder
 	for i, c := range t.Columns {
 		if c.Kind == ast.ColumnKindInt {
-			fields.WriteString(fmt.Sprintf(`{"name": "%s", "type": "int", "default": 0}`, c.Name))
+			s := fmt.Sprintf(`{"name": "%s", "type": "int", "default": 0}`, c.Name)
+			fields.WriteString(s)
 		} else {
-			fields.WriteString(fmt.Sprintf(`{"name": "%s", "type": "string", "default": ""}`, c.Name))
+			s := fmt.Sprintf(`{"name": "%s", "type": "string", "default": ""}`, c.Name)
+			fields.WriteString(s)
 		}
 		if i < len(t.Columns)-1 {
 			fields.WriteString(",")
@@ -192,7 +197,7 @@ func (t Table) save(rows []Row) (int, error) {
 	defer f.Close()
 
 	// accumulated size of rows inserted in this call
-	var size1 uint16
+	var size1, offset uint16
 	// write rows into file with Avro binary format
 	w := bufio.NewWriter(f)
 	for _, r := range rows {
@@ -209,16 +214,17 @@ func (t Table) save(rows []Row) (int, error) {
 		// update index for all columns
 		// Note: we don't use page and block now, so we set them to 0
 		// TODO: organize row binary data into pages and blocks later
-		size1 += uint16(len(bytes))
-		v := uint16(size) + size1
+		l := uint16(len(bytes))
+		size1 += l
 		for _, c := range t.Columns {
 			if idx := t.index; idx != nil {
 				var p, b uint16
 				c := string(c.Name)
 				n := get(record, c)
-				idx.insert(c, n, v, p, b)
+				idx.insert(c, n, offset, l, p, b)
 			}
 		}
+		offset = uint16(size) + size1
 	}
 	w.Flush()
 	return len(rows), nil
@@ -254,10 +260,6 @@ func (t *Table) loadRows() ([]Row, error) {
 	if os.IsNotExist(err) {
 		return nil, err
 	}
-	codec, err := t.composeAvroCodec()
-	if err != nil {
-		return nil, err
-	}
 	f, err := os.OpenFile(t.dataPath(), os.O_RDONLY, 0644)
 	if err != nil {
 		return nil, err
@@ -276,32 +278,11 @@ func (t *Table) loadRows() ([]Row, error) {
 		if len(line) == 1 && line[0] == rowSeparator {
 			continue
 		}
-		native, _, err := codec.NativeFromBinary(line)
-		if err != nil || native == nil {
+		r, err := t.decodeRow(line)
+		if err != nil {
 			return nil, err
 		}
-		record, ok := native.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		row := make(Row, 0, len(t.Columns))
-		for _, c := range t.Columns {
-			v := record[string(c.Name)]
-			if c.Kind == ast.ColumnKindInt {
-				iv, ok := v.(int32)
-				if !ok {
-					return nil, errConvertIntFailed
-				}
-				row = append(row, Field(strconv.Itoa(int(iv))))
-			} else {
-				sv, ok := v.(string)
-				if !ok {
-					return nil, errConvertTextFailed
-				}
-				row = append(row, Field(sv).purify())
-			}
-		}
-		rows = append(rows, row)
+		rows = append(rows, r)
 
 	}
 	return rows, nil
@@ -324,4 +305,38 @@ func NewTable(stmt ast.QueryStmtCreateTable) *Table {
 	}
 	t.createIndex()
 	return t
+}
+
+// DecodeRow decodes a row from binary data.
+func (t Table) decodeRow(b []byte) (Row, error) {
+	codec, err := t.composeAvroCodec()
+	if err != nil {
+		return nil, err
+	}
+	native, _, err := codec.NativeFromBinary(b)
+	if err != nil || native == nil {
+		return nil, err
+	}
+	record, ok := native.(map[string]interface{})
+	if !ok {
+		return nil, errConvertRecordFailed
+	}
+	row := make(Row, 0, len(t.Columns))
+	for _, c := range t.Columns {
+		v := record[string(c.Name)]
+		if c.Kind == ast.ColumnKindInt {
+			iv, ok := v.(int32)
+			if !ok {
+				return nil, errConvertIntFailed
+			}
+			row = append(row, Field(strconv.Itoa(int(iv))))
+		} else {
+			sv, ok := v.(string)
+			if !ok {
+				return nil, errConvertTextFailed
+			}
+			row = append(row, Field(sv).purify())
+		}
+	}
+	return row, nil
 }

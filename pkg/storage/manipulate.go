@@ -2,6 +2,7 @@ package storage
 
 import (
 	"errors"
+	"os"
 
 	"github.com/wangwalker/gpostgres/pkg/ast"
 	"golang.org/x/exp/slices"
@@ -12,6 +13,8 @@ var (
 	ErrTableNotExisted       = errors.New("table not existed")
 	ErrValuesIncomplete      = errors.New("inserted values isn't complete")
 	ErrColumnNamesNotMatched = errors.New("table column names aren't matched")
+	ErrIndexNotExisted       = errors.New("table index not existed")
+	ErrRowNotExisted         = errors.New("table row not existed")
 )
 
 func CreateTable(stmt *ast.QueryStmtCreateTable) error {
@@ -82,6 +85,7 @@ func Select(stmt *ast.QueryStmtSelectValues) ([]Row, error) {
 	}
 
 	filtered := table.Rows
+	// if where cluase is not empty, filter rows
 	if !stmt.Where.IsEmpty() {
 		filtered, _ = table.filter(stmt.Where)
 	}
@@ -165,7 +169,7 @@ OUTER:
 	return filtered, indexes
 }
 
-// Tests if one row if matched with where clause.
+// Tests if one row matches with where clause condition.
 // Note: the row is just slice of Field, so using index indicates which field to test.
 func (r Row) matched(where ast.WhereClause, index int) bool {
 	switch where.Cmp {
@@ -198,4 +202,40 @@ func (r Row) update(newValues []ast.ColumnUpdatedValue, table Table) {
 			}
 		}
 	}
+}
+
+// Search searchs the table with index and returns the row.
+func (mt Table) search(c ast.ColumnName, f Field) (Row, error) {
+	if mt.index == nil {
+		return nil, ErrIndexNotExisted
+	}
+	btree := mt.index.get(string(c))
+	if btree == nil {
+		return nil, ErrIndexNotExisted
+	}
+	key := btree.search(string(f))
+	if key.isEmpty() {
+		return nil, ErrRowNotExisted
+	}
+	// read binary row data from local file
+	return mt.read(key)
+}
+
+// Read reads the row data from local file.
+func (t Table) read(k key) (Row, error) {
+	f, err := os.OpenFile(t.dataPath(), os.O_RDONLY, 0666)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	_, err = f.Seek(int64(k.Offset), 0)
+	if err != nil {
+		return nil, err
+	}
+	b := make([]byte, k.Length)
+	_, err = f.Read(b)
+	if err != nil {
+		return nil, err
+	}
+	return t.decodeRow(b)
 }

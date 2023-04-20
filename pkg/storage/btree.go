@@ -17,10 +17,11 @@ const t = 2
 // to improve performance, we can update file with buffers, and flush the
 // buffers to disk when the buffer is full.
 type key struct {
-	Name  string `json:"name"`
-	Value uint16 `json:"value"`
-	Page  uint16 `json:"page"`
-	Block uint16 `json:"block"`
+	Name   string `json:"n"`
+	Offset uint16 `json:"v"`
+	Length uint16 `json:"l"`
+	Page   uint16 `json:"p"`
+	Block  uint16 `json:"b"`
 }
 
 func (k key) lt(other key) bool {
@@ -28,14 +29,14 @@ func (k key) lt(other key) bool {
 }
 
 func (k key) isEmpty() bool {
-	return k.Name == "" && k.Value == 0
+	return k.Name == "" && k.Offset == 0
 }
 
 type node struct {
-	Keys     []key   `json:"keys"`
-	Children []*node `json:"children"`
-	IsLeaf   bool    `json:"is_leaf"`
-	Level    int     `json:"level"`
+	Keys     []key   `json:"k"`
+	Children []*node `json:"c"`
+	IsLeaf   bool    `json:"i"`
+	Level    int     `json:"l"`
 }
 
 // Search key in the B-tree.
