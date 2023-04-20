@@ -150,13 +150,13 @@ func indexesOf(sub, columns []ast.ColumnName) []int {
 }
 
 // Returns all the rows and indexes meeting where clause for one table.
-func (mt Table) filter(where ast.WhereClause) ([]Row, []int) {
-	filtered := make([]Row, 0, mt.Len)
-	indexes := make([]int, 0, mt.Len)
-	columnIndex := slices.Index(mt.ColumnNames, where.Column)
+func (t Table) filter(where ast.WhereClause) ([]Row, []int) {
+	filtered := make([]Row, 0, t.Len)
+	indexes := make([]int, 0, t.Len)
+	columnIndex := slices.Index(t.ColumnNames, where.Column)
 OUTER:
-	for _, cn := range mt.ColumnNames {
-		for i, r := range mt.Rows {
+	for _, cn := range t.ColumnNames {
+		for i, r := range t.Rows {
 			if cn != where.Column {
 				continue OUTER
 			}
@@ -205,11 +205,11 @@ func (r Row) update(newValues []ast.ColumnUpdatedValue, table Table) {
 }
 
 // Search searchs the table with index and returns the row.
-func (mt Table) search(c ast.ColumnName, f Field) (Row, error) {
-	if mt.index == nil {
+func (t Table) search(c ast.ColumnName, f Field) (Row, error) {
+	if t.index == nil {
 		return nil, ErrIndexNotExisted
 	}
-	btree := mt.index.get(string(c))
+	btree := t.index.get(string(c))
 	if btree == nil {
 		return nil, ErrIndexNotExisted
 	}
@@ -218,7 +218,7 @@ func (mt Table) search(c ast.ColumnName, f Field) (Row, error) {
 		return nil, ErrRowNotExisted
 	}
 	// read binary row data from local file
-	return mt.read(key)
+	return t.read(key)
 }
 
 // Read reads the row data from local file.
