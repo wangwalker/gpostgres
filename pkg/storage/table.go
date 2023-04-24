@@ -112,9 +112,14 @@ func (t Table) dataPath() string {
 // LoadScheme loads all schemes of tables from files when starting the program.
 // It should be called in init function of storage package.
 func loadSchemes() {
+	_, err := os.Stat(config.SchemeDir)
+	if err != nil && os.IsNotExist(err) {
+		// create scheme dir when first run program
+		_ = os.MkdirAll(config.SchemeDir, 0644)
+	}
 	files, err := os.ReadDir(config.SchemeDir)
 	if err != nil {
-		fmt.Printf("Failed to read data directory %s: %s", config.DataDir, err)
+		fmt.Printf("Failed to read data directory %s: %s", config.SchemeDir, err)
 		return
 	}
 	for _, f := range files {
