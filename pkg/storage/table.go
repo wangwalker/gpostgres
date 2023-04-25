@@ -115,7 +115,7 @@ func loadSchemes() {
 	_, err := os.Stat(config.SchemeDir)
 	if err != nil && os.IsNotExist(err) {
 		// create scheme dir when first run program
-		_ = os.MkdirAll(config.SchemeDir, 0644)
+		_ = os.MkdirAll(config.SchemeDir, 0755)
 	}
 	files, err := os.ReadDir(config.SchemeDir)
 	if err != nil {
