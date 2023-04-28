@@ -102,6 +102,7 @@ func columnFormats(rows []Row, columnNames []ast.ColumnName) []widthFormat {
 	return formats
 }
 
+// TODO: add unit tests for this function
 func formatForWidth(w int) widthFormat {
 	if w <= 5 {
 		return widthFormat{5, "%-5s%s"}

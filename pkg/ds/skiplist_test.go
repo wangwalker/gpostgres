@@ -10,27 +10,32 @@ func (m *mockDicisionMaker) ShouldInsert() bool {
 	return m.shouldInsert
 }
 
+func makeIndexData(o uint16) IndexData {
+	return IndexData{o, 0, 0, 0}
+}
+
 func TestCreateSkipListNode(t *testing.T) {
-	head := NewSkipList("a", 1)
-	if head.key != "a" || head.value != 1 || head.right != nil || head.down != nil {
-		t.Errorf("NewSkipList(1, \"a\") = %v, want %v", head, SkipListNode{"a", 1, nil, nil, &RandomDicisionMaker{}})
+	data := IndexData{1, 1, 0, 0}
+	head := NewSkipList("a", data)
+	if head.Key != "a" || head.Data.Offset != 1 || head.Right != nil || head.Down != nil {
+		t.Errorf("NewSkipList(\"a\", 1) = %v, want \"a\"", head)
 	}
 }
 
 func TestInsertAndSearchSkipListNode(t *testing.T) {
 	// GIVEN
-	head := NewSkipList("a", 1)
-	head = head.Insert("b", 2)
-	head = head.Insert("c", 3)
-	head = head.Insert("d", 4)
-	head = head.Insert("e", 5)
+	head := NewSkipList("a", makeIndexData(1))
+	head = head.Insert("b", makeIndexData(2))
+	head = head.Insert("c", makeIndexData(3))
+	head = head.Insert("d", makeIndexData(4))
+	head = head.Insert("e", makeIndexData(5))
 
 	// WHEN
-	r1 := head.Search("a")
-	r2 := head.Search("b")
-	r3 := head.Search("c")
-	r4 := head.Search("d")
-	r5 := head.Search("e")
+	r1 := head.Search("a").Offset
+	r2 := head.Search("b").Offset
+	r3 := head.Search("c").Offset
+	r4 := head.Search("d").Offset
+	r5 := head.Search("e").Offset
 
 	// THEN
 	if r1 != 1 {
@@ -52,36 +57,37 @@ func TestInsertAndSearchSkipListNode(t *testing.T) {
 
 func TestUpdateSkipListNode(t *testing.T) {
 	// GIVEN
-	head := NewSkipList("a", 1)
-	head = head.Insert("b", 2)
-	head = head.Insert("c", 3)
+	head := NewSkipList("a", makeIndexData(1))
+	head.SetDicisionMaker(&mockDicisionMaker{true})
+	head = head.Insert("b", makeIndexData(2))
+	head = head.Insert("c", makeIndexData(3))
 
 	// WHEN
-	head.Update("b", 4)
+	head.Update("b", makeIndexData(4))
 
 	// THEN
-	if head.Search("b") != 4 {
-		t.Errorf("head.Search(2) = %v, want \"4\"", head.Search("b"))
+	if head.Search("b").Offset != 4 {
+		t.Errorf("head.Search(b) = %v, want \"4\"", head.Search("b"))
 	}
 }
 
 func TestUpdateSkipListHeadNode(t *testing.T) {
 	// GIVEN
-	head := NewSkipList("a", 1)
-	head = head.Insert("b", 12)
-	head = head.Insert("c", 13)
-	head = head.Insert("d", 14)
+	head := NewSkipList("a", makeIndexData(1))
+	head = head.Insert("b", makeIndexData(12))
+	head = head.Insert("c", makeIndexData(13))
+	head = head.Insert("d", makeIndexData(14))
 
 	// WHEN
-	head.Update("a", 11)
+	head.Update("a", makeIndexData(11))
 
 	// THEN
-	if head.Search("a") != 11 {
+	if head.Search("a").Offset != 11 {
 		t.Errorf("head.Search(a) = %v, want \"11\"", head.Search("a"))
 	}
-	for p := head; p != nil; p = p.down {
-		if p.key == "a" && p.value != 11 {
-			t.Errorf("p.value = %v, want \"11\"", p.value)
+	for p := head; p != nil; p = p.Down {
+		if p.Key == "a" && p.Data.Offset != 11 {
+			t.Errorf("p.value = %v, want \"11\"", p.Data.Offset)
 		}
 	}
 
@@ -89,120 +95,112 @@ func TestUpdateSkipListHeadNode(t *testing.T) {
 
 func TestInsertWithMockDicisionMaker(t *testing.T) {
 	// GIVEN
-	head := NewSkipList("a", 1)
+	head := NewSkipList("a", makeIndexData(1))
 	head.SetDicisionMaker(&mockDicisionMaker{false})
-	head = head.Insert("b", 2)
+	head = head.Insert("b", makeIndexData(2))
 
 	// GIVEN
 	head.SetDicisionMaker(&mockDicisionMaker{true})
-	head = head.Insert("c", 3)
+	head = head.Insert("c", makeIndexData(3))
 
 	// THEN
-	if head.key != "a" {
-		t.Errorf("head.key = %v, want 1", head.key)
+	if head.Key != "a" {
+		t.Errorf("head.Key = %v, want 1", head.Key)
 	}
-	if head.right.key != "c" {
-		t.Errorf("head.right.key = %v, want c", head.right.key)
+	if head.Right.Key != "c" {
+		t.Errorf("head.Right.Key = %v, want c", head.Right.Key)
 	}
-	if head.down.key != "a" {
-		t.Errorf("head.down.key = %v, want a", head.down.key)
+	if head.Down.Key != "a" {
+		t.Errorf("head.Down.Key = %v, want a", head.Down.Key)
 	}
-	if head.down.right.key != "b" || head.down.right.right.key != "c" {
-		t.Errorf("head.down.right.key = %v, want b", head.down.right.key)
+	if head.Down.Right.Key != "b" || head.Down.Right.Right.Key != "c" {
+		t.Errorf("head.Down.Right.Key = %v, want b", head.Down.Right.Key)
 	}
 
 	// GIVEN
 	head.SetDicisionMaker(&mockDicisionMaker{false})
-	head = head.Insert("d", 4)
+	head = head.Insert("d", makeIndexData(4))
 	head.SetDicisionMaker(&mockDicisionMaker{true})
-	head = head.Insert("e", 5)
+	head = head.Insert("e", makeIndexData(5))
 
 	// THEN
-	if head.key != "a" {
-		t.Errorf("head.key = %v, want a", head.key)
+	if head.Key != "a" {
+		t.Errorf("head.Key = %v, want a", head.Key)
 	}
-	if head.right.key != "e" {
-		t.Errorf("head.right.key = %v, want e", head.right.key)
+	if head.Right.Key != "e" {
+		t.Errorf("head.Right.Key = %v, want e", head.Right.Key)
 	}
-	if head.down.key != "a" {
-		t.Errorf("head.down.key = %v, want a", head.down.key)
+	if head.Down.Key != "a" {
+		t.Errorf("head.Down.Key = %v, want a", head.Down.Key)
 	}
-	if head.down.right.key != "c" || head.down.right.right.key != "e" {
-		t.Errorf("head.down.right.key = %v, want c", head.down.right.key)
-		t.Errorf("head.down.right.right.key = %v, want e", head.down.right.right.key)
+	if head.Down.Right.Key != "c" || head.Down.Right.Right.Key != "e" {
+		t.Errorf("head.Down.Right.Key = %v, want c", head.Down.Right.Key)
+		t.Errorf("head.Down.Right.Right.Key = %v, want e", head.Down.Right.Right.Key)
 	}
-	if head.down.down.key != "a" {
-		t.Errorf("head.down.down.key = %v, want a", head.down.down.key)
+	if head.Down.Down.Key != "a" {
+		t.Errorf("head.Down.Down.Key = %v, want a", head.Down.Down.Key)
 	}
-	if head.down.down.right.right.right.key != "d" {
-		t.Errorf("head.down.down.right.right.right.key = %v, want 4", head.down.down.right.right.right.key)
+	if head.Down.Down.Right.Right.Right.Key != "d" {
+		t.Errorf("head.Down.Down.Right.Right.Right.Key = %v, want 4", head.Down.Down.Right.Right.Right.Key)
 	}
 }
 
 func TestDeleteSkipListNode(t *testing.T) {
 	// GIVEN
-	head := NewSkipList("a", 1)
-	head = head.Insert("b", 2)
-	head = head.Insert("c", 3)
-	head = head.Insert("d", 4)
-	head = head.Insert("e", 5)
+	head := NewSkipList("a", makeIndexData(1))
+	head = head.Insert("b", makeIndexData(2))
+	head = head.Insert("c", makeIndexData(3))
+	head = head.Insert("d", makeIndexData(4))
+	head = head.Insert("e", makeIndexData(5))
 
 	// WHEN
 	head.Delete("c")
 
 	// THEN
-	if head.Search("c") != 0 {
+	if head.Search("c").Offset != 0 {
 		t.Errorf("head.Search(3) = %v, want 0", head.Search("c"))
 	}
-	if head.down.Search("c") != 0 {
-		t.Errorf("head.down.Search(3) = %v, want 0", head.down.Search("c"))
+	if head.Down != nil && head.Down.Search("c").Offset != 0 {
+		t.Errorf("head.Down.Search(3) = %v, want 0", head.Down.Search("c"))
 	}
-	if head.right.Search("c") != 0 {
-		t.Errorf("head.right.Search(3) = %v, want 0", head.right.Search("c"))
+	if head.Right != nil && head.Right.Search("c").Offset != 0 {
+		t.Errorf("head.Right.Search(3) = %v, want 0", head.Right.Search("c"))
 	}
-	if head.right.down.Search("c") != 0 {
-		t.Errorf("head.right.down.Search(3) = %v, want 0", head.right.down.Search("c"))
+	if head.Right.Down != nil && head.Right.Down.Search("c").Offset != 0 {
+		t.Errorf("head.Right.Down.Search(3) = %v, want 0", head.Right.Down.Search("c"))
 	}
 }
 
 func TestTheMostLowListContainsAllNodes(t *testing.T) {
 	// GIVEN
-	head := NewSkipList("a", 1)
+	head := NewSkipList("a", makeIndexData(1))
 	head.SetDicisionMaker(&mockDicisionMaker{true})
-	head = head.Insert("b", 2)
-	head = head.Insert("c", 3)
-	head = head.Insert("d", 4)
-	head = head.Insert("e", 5)
+	head = head.Insert("b", makeIndexData(2))
+	head = head.Insert("c", makeIndexData(3))
+	head = head.Insert("d", makeIndexData(4))
+	head = head.Insert("e", makeIndexData(5))
 
 	// WHEN
-	p := head
-	for p.down != nil {
-		p = p.down
-	}
-	data := make(map[string]int)
-	for p != nil {
-		data[p.key] = int(p.value)
-		p = p.right
-	}
+	nodes := head.AllNodes()
 
 	// THEN
-	if len(data) != 5 {
-		t.Errorf("len(data) = %v, want 5", len(data))
+	if len(nodes) != 5 {
+		t.Errorf("len(nodes) = %v, want 5", len(nodes))
 	}
-	if data["a"] != 1 {
-		t.Errorf("data[\"a\"] = %v, want 1", data["a"])
+	if nodes[0].Key != "a" && nodes[0].Data.Offset != 1 {
+		t.Errorf("nodes[0] = %v, want a", nodes[0])
 	}
-	if data["b"] != 2 {
-		t.Errorf("data[\"b\"] = %v, want 2", data["b"])
+	if nodes[1].Key != "b" && nodes[1].Data.Offset != 2 {
+		t.Errorf("nodes[1] = %v, want b", nodes[1])
 	}
-	if data["c"] != 3 {
-		t.Errorf("data[\"c\"] = %v, want 3", data["c"])
+	if nodes[2].Key != "c" && nodes[2].Data.Offset != 3 {
+		t.Errorf("nodes[2] = %v, want c", nodes[2])
 	}
-	if data["d"] != 4 {
-		t.Errorf("data[\"d\"] = %v, want 4", data["d"])
+	if nodes[3].Key != "d" && nodes[3].Data.Offset != 4 {
+		t.Errorf("nodes[3] = %v, want d", nodes[3])
 	}
-	if data["e"] != 5 {
-		t.Errorf("data[\"e\"] = %v, want 5", data["e"])
+	if nodes[4].Key != "e" && nodes[4].Data.Offset != 5 {
+		t.Errorf("nodes[4] = %v, want e", nodes[4])
 	}
 
 }

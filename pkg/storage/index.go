@@ -15,22 +15,25 @@ import (
 // column name, value is the btree node of the column, when creating table.
 // So by default, we will create indexes for all columns of a table.
 type Index struct {
-	Name    string                   `json:"n"` // table name
-	Btrees  map[string]*ds.BtreeNode `json:"b"`
+	Name    string               `json:"n"` // table name
+	Btrees  map[string]*ds.Btree `json:"b"`
 	writers map[string]*bufio.Writer
 	ticker  *time.Ticker
 }
 
 // NewIndex creates new index for table when creating.
 func NewIndex(t Table) *Index {
-	btrees := make(map[string]*ds.BtreeNode)
+	btrees := make(map[string]*ds.Btree)
 	for _, c := range t.Columns {
-		btrees[string(c.Name)] = &ds.BtreeNode{IsLeaf: true, Level: 1}
+		cn := string(c.Name)
+		btrees[cn] = ds.NewBtree(2)
 	}
-	return &Index{
-		Name:   t.Name,
-		Btrees: btrees,
+	i := &Index{Name: t.Name, Btrees: btrees}
+	for _, c := range t.Columns {
+		cn := string(c.Name)
+		btrees[cn].SetPath(i.path(cn))
 	}
+	return i
 }
 
 // Path returns the path of the index file for a column.
@@ -44,7 +47,7 @@ func (i Index) path(c string) string {
 }
 
 // Get gets the index of a column with the column name.
-func (i Index) get(c string) *ds.BtreeNode {
+func (i Index) get(c string) *ds.Btree {
 	return i.Btrees[c]
 }
 
@@ -58,34 +61,8 @@ func (index *Index) insert(c, n string, offset, length, p, b uint16) {
 	if btree == nil {
 		return
 	}
-	btree.Insert(ds.BtreeKey{Name: n, Offset: offset, Length: length, Page: p, Block: b})
-	// update index file
-	path := index.path(c)
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-	if err != nil {
-		fmt.Printf("open index file failed: %v, path: %s\n", err, path)
-		return
-	}
-	defer f.Close()
-	// Truncate original content of the index file.
-	if err := f.Truncate(0); err != nil {
-		fmt.Printf("truncate index file failed: %v, path: %s\n", err, path)
-		return
-	}
-	// TODO: Use effective way to update index file.
-	bytes, err := json.Marshal(index.Btrees[c])
-	if err != nil {
-		fmt.Printf("marshal index failed: %v\n", err)
-		return
-	}
-	w := bufio.NewWriter(f)
-	if _, err := w.Write(bytes); err != nil {
-		fmt.Printf("write index failed: %v\n", err)
-		return
-	}
-	if err := w.Flush(); err != nil {
-		fmt.Printf("flush index failed: %v\n", err)
-	}
+	key := ds.BtreeKey{Name: n, Offset: offset, Length: length, Page: p, Block: b}
+	btree.Insert(key, index.Name, c)
 }
 
 // Search searches a key in the B-tree index, f is the indexed field of a row.
@@ -130,7 +107,7 @@ func (t *Table) loadIndex() {
 		}
 		defer f.Close()
 
-		var btree ds.BtreeNode
+		var btree ds.Btree
 		if err := json.NewDecoder(f).Decode(&btree); err != nil {
 			fmt.Printf("decode index failed: %v\n", err)
 			return

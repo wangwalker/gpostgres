@@ -320,10 +320,10 @@ func TestLoadSchemesAndSaveRow(t *testing.T) {
 	if t2.index.get("age") == nil {
 		t.Errorf("table index is not loaded")
 	}
-	if t2.index.get("name").Keys == nil {
+	if t2.index.get("name").Root.Keys == nil {
 		t.Errorf("table name index should not be nil")
 	}
-	if t2.index.get("age").Keys == nil {
+	if t2.index.get("age").Root.Keys == nil {
 		t.Errorf("table age index should not be nil")
 	}
 }

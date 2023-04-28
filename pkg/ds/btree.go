@@ -1,14 +1,13 @@
 package ds
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
+	"os"
 )
 
-// Using t to represent the half of degree of the B-tree,
-// which means the maximum number of Keys in a node is 2t-1.
-var t = 2
-
-// Key is the key of the B-tree. It contains metadata for the btree node,
+// BtreeKey is the key of the B-tree. It contains metadata for btree node,
 // name is used to compare the order of Keys, value is used to store other
 // information, such as the offset or id of the row, page and block is the
 // position of the row in the local binary file.
@@ -39,116 +38,140 @@ type BtreeNode struct {
 	Level    int          `json:"l"`
 }
 
-// Config configures the B-tree.
-func (tree *BtreeNode) Config(degree int) {
-	if degree < 2 {
-		degree = 2
+type Btree struct {
+	Root *BtreeNode `json:"r"`
+	// half of the degree of the B-tree
+	degree int
+	path   string
+}
+
+func NewBtree(d int) *Btree {
+	return &Btree{Root: &BtreeNode{IsLeaf: true, Level: 1}, degree: d}
+}
+
+// SetPath sets the path of the B-tree file.
+func (tree *Btree) SetPath(path string) {
+	if path == "" {
+		return
 	}
-	t = degree
+	tree.path = path
 }
 
 // Search key in the B-tree.
-func (tree *BtreeNode) Search(n string) BtreeKey {
+func (t *Btree) Search(k string) BtreeKey {
+	return t.search(t.Root, k)
+}
+
+func (t *Btree) search(n *BtreeNode, k string) BtreeKey {
 	i := 0
-	for i < len(tree.Keys) && n > tree.Keys[i].Name {
+	for i < len(n.Keys) && k > n.Keys[i].Name {
 		i++
 	}
-	if i < len(tree.Keys) && n == tree.Keys[i].Name {
-		return tree.Keys[i]
+	if i < len(n.Keys) && k == n.Keys[i].Name {
+		return n.Keys[i]
 	}
-	if tree.IsLeaf {
+	if n.IsLeaf {
 		return BtreeKey{}
 	}
-	return tree.Children[i].Search(n)
+	return t.search(n.Children[i], k)
 }
 
 // Insert inserts a key into the B-tree, which is the outer interface.
-func (tree *BtreeNode) Insert(k BtreeKey) *BtreeNode {
-	i := len(tree.Keys) - 1
-	if tree.IsLeaf {
-		tree.Keys = append(tree.Keys, k)
+// K is the key of the B-tree, tn is the name of the table, c is the name
+// of the column.
+func (t *Btree) Insert(k BtreeKey, tn, c string) *BtreeNode {
+	return t.insert(t.Root, k, tn, c)
+}
+
+func (t *Btree) insert(n *BtreeNode, k BtreeKey, tn, c string) *BtreeNode {
+	i := len(n.Keys) - 1
+	if n.IsLeaf {
+		n.Keys = append(n.Keys, k)
 		j := i
-		for ; j >= 0 && k.lt(tree.Keys[j]); j-- {
-			tree.Keys[j+1] = tree.Keys[j]
+		for ; j >= 0 && k.lt(n.Keys[j]); j-- {
+			n.Keys[j+1] = n.Keys[j]
 		}
-		tree.Keys[j+1] = k
-		return tree
+		n.Keys[j+1] = k
+		go t.sync(tn, c)
+		return n
 	}
-	for i >= 0 && k.lt(tree.Keys[i]) {
+	for i >= 0 && k.lt(n.Keys[i]) {
 		i--
 	}
 	i++
-	if len(tree.Children[i].Keys) == 2*t-1 {
-		tree.splitChild(i, tree.Children[i])
+	if len(n.Children[i].Keys) == 2*t.degree-1 {
+		t.splitChild(n, i)
 		// recalculate the index after split node
-		i = len(tree.Keys) - 1
-		for i >= 0 && k.lt(tree.Keys[i]) {
+		i = len(n.Keys) - 1
+		for i >= 0 && k.lt(n.Keys[i]) {
 			i--
 		}
 		i++
 	}
-	return tree.Children[i].Insert(k)
+	return t.insert(n.Children[i], k, tn, c)
 }
 
 // Split node when the number of the keys = [2*t-1].
 // In this case, first split the original child into two pieces with the
 // middle key, then constuct a new node with the middle key and two children,
 // finally insert the new node into the  parent node.
-func (parent *BtreeNode) splitChild(i int, child *BtreeNode) {
+func (t *Btree) splitChild(parent *BtreeNode, i int) {
 	// split original child into two pieces with the middle key,
 	// child1, child2 = child[:t-1], child[t:]
+	child := parent.Children[i]
 	var child1, child2 *BtreeNode
 	Level := child.Level + 1
 	if child.IsLeaf {
 		child1 = &BtreeNode{
-			Keys:     child.Keys[:t-1],
+			Keys:     child.Keys[:t.degree-1],
 			Children: nil,
 			IsLeaf:   child.IsLeaf,
 			Level:    Level,
 		}
 		child2 = &BtreeNode{
-			Keys:     child.Keys[t:],
+			Keys:     child.Keys[t.degree:],
 			Children: nil,
 			IsLeaf:   child.IsLeaf,
 			Level:    Level,
 		}
 	} else {
 		child1 = &BtreeNode{
-			Keys:     child.Keys[:t-1],
-			Children: child.Children[:t-1],
+			Keys:     child.Keys[:t.degree-1],
+			Children: child.Children[:t.degree-1],
 			IsLeaf:   child.IsLeaf,
 			Level:    Level,
 		}
 		child2 = &BtreeNode{
-			Keys:     child.Keys[t:],
-			Children: child.Children[t:],
+			Keys:     child.Keys[t.degree:],
+			Children: child.Children[t.degree:],
 			IsLeaf:   child.IsLeaf,
 			Level:    Level,
 		}
 	}
 
 	subParent := &BtreeNode{
-		Keys:     []BtreeKey{child.Keys[t-1]},
+		Keys:     []BtreeKey{child.Keys[t.degree-1]},
 		Children: []*BtreeNode{child1, child2},
 		IsLeaf:   false,
 		Level:    child.Level,
 	}
 	parent.Children[i] = subParent
-	parent.merge(subParent, i)
+	t.merge(parent, subParent, i)
 }
 
-// Merge merges parent and child node when the number of parent's keys < 2*t-1.
-// Child node is the new node after spliting, so it has just one key and two children.
+// Merge merges parent and child node when number of parent's keys < 2*t-1.
+// Child is the new node after spliting, it has just one key and two children.
 // It should be called after splitChild to balance tree.
-func (parent *BtreeNode) merge(child *BtreeNode, i int) {
-	if len(parent.Keys) == 2*t-1 {
+func (t *Btree) merge(parent, child *BtreeNode, i int) {
+	if len(parent.Keys) == 2*t.degree-1 {
 		return
 	}
 	if i == 0 {
 		parent.Keys = append(child.Keys, parent.Keys...)
 		parent.Children = append(child.Children, parent.Children[1:]...)
 	} else if len(parent.Keys) > i {
-		// split parent's Keys into two pieces, the middle one will be the only key at child node
+		// split parent's keys into two parts,
+		// the middle one will be the only key at child node
 		k1, k2 := parent.Keys[:i], parent.Keys[i:]
 		Keys := make([]BtreeKey, 0, len(k1)+len(k2)+1)
 		Keys = append(Keys, k1...)
@@ -173,11 +196,44 @@ func (parent *BtreeNode) merge(child *BtreeNode, i int) {
 	}
 }
 
-func traverse(tree *BtreeNode) {
-	fmt.Printf("level = %d, keys = %+v\n", tree.Level, tree.Keys)
-	for i := range tree.Children {
-		if !tree.IsLeaf && tree.Children[i] != nil {
-			traverse(tree.Children[i])
+func (t *Btree) traverse(n *BtreeNode) {
+	fmt.Printf("level = %d, keys = %+v\n", n.Level, n.Keys)
+	for i := range n.Children {
+		if !n.IsLeaf && n.Children[i] != nil {
+			t.traverse(n.Children[i])
 		}
+	}
+}
+
+// sync writes the btree node data to disk.
+func (tree *Btree) sync(tn, c string) {
+	path := tree.path
+	if path == "" {
+		return
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		fmt.Printf("open index file failed: %v, path: %s\n", err, path)
+		return
+	}
+	defer f.Close()
+	// Truncate original content of the index file.
+	if err := f.Truncate(0); err != nil {
+		fmt.Printf("truncate index file failed: %v, path: %s\n", err, path)
+		return
+	}
+	// TODO: Use effective way to update index file.
+	bytes, err := json.Marshal(tree)
+	if err != nil {
+		fmt.Printf("marshal index failed: %v\n", err)
+		return
+	}
+	w := bufio.NewWriter(f)
+	if _, err := w.Write(bytes); err != nil {
+		fmt.Printf("write index failed: %v\n", err)
+		return
+	}
+	if err := w.Flush(); err != nil {
+		fmt.Printf("flush index failed: %v\n", err)
 	}
 }

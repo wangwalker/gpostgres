@@ -16,4 +16,4 @@ __debug_bin
 # vendor/
 .vscode/*
 storage/*
-pkg/storage/tempstorage/*
+pkg/*/tempstorage/*
