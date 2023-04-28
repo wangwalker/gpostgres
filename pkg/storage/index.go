@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"time"
+
+	"github.com/wangwalker/gpostgres/pkg/ds"
 )
 
 // Index is all indexes of a table. As every column could has an index, so
@@ -13,17 +15,17 @@ import (
 // column name, value is the btree node of the column, when creating table.
 // So by default, we will create indexes for all columns of a table.
 type Index struct {
-	Name    string           `json:"n"` // table name
-	Btrees  map[string]*node `json:"b"`
+	Name    string                   `json:"n"` // table name
+	Btrees  map[string]*ds.BtreeNode `json:"b"`
 	writers map[string]*bufio.Writer
 	ticker  *time.Ticker
 }
 
 // NewIndex creates new index for table when creating.
 func NewIndex(t Table) *Index {
-	btrees := make(map[string]*node)
+	btrees := make(map[string]*ds.BtreeNode)
 	for _, c := range t.Columns {
-		btrees[string(c.Name)] = &node{IsLeaf: true, Level: 1}
+		btrees[string(c.Name)] = &ds.BtreeNode{IsLeaf: true, Level: 1}
 	}
 	return &Index{
 		Name:   t.Name,
@@ -42,7 +44,7 @@ func (i Index) path(c string) string {
 }
 
 // Get gets the index of a column with the column name.
-func (i Index) get(c string) *node {
+func (i Index) get(c string) *ds.BtreeNode {
 	return i.Btrees[c]
 }
 
@@ -56,7 +58,7 @@ func (index *Index) insert(c, n string, offset, length, p, b uint16) {
 	if btree == nil {
 		return
 	}
-	btree.insert(key{Name: n, Offset: offset, Length: length, Page: p, Block: b})
+	btree.Insert(ds.BtreeKey{Name: n, Offset: offset, Length: length, Page: p, Block: b})
 	// update index file
 	path := index.path(c)
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
@@ -88,12 +90,12 @@ func (index *Index) insert(c, n string, offset, length, p, b uint16) {
 
 // Search searches a key in the B-tree index, f is the indexed field of a row.
 // If the key is not found, it returns -1, otherwise it returns the row id.
-func (index *Index) search(c string, f Field) key {
+func (index *Index) search(c string, f Field) ds.BtreeKey {
 	btree := index.get(c)
 	if btree == nil {
-		return key{}
+		return ds.BtreeKey{}
 	}
-	return btree.search(string(f))
+	return btree.Search(string(f))
 }
 
 // CreateIndex creates index for a table.
@@ -128,7 +130,7 @@ func (t *Table) loadIndex() {
 		}
 		defer f.Close()
 
-		var btree node
+		var btree ds.BtreeNode
 		if err := json.NewDecoder(f).Decode(&btree); err != nil {
 			fmt.Printf("decode index failed: %v\n", err)
 			return

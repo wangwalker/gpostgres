@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/wangwalker/gpostgres/pkg/ast"
+	"github.com/wangwalker/gpostgres/pkg/ds"
 	"golang.org/x/exp/slices"
 )
 
@@ -213,8 +214,8 @@ func (t Table) search(c ast.ColumnName, f Field) (Row, error) {
 	if btree == nil {
 		return nil, ErrIndexNotExisted
 	}
-	key := btree.search(string(f))
-	if key.isEmpty() {
+	key := btree.Search(string(f))
+	if key.IsEmpty() {
 		return nil, ErrRowNotExisted
 	}
 	// read binary row data from local file
@@ -222,7 +223,7 @@ func (t Table) search(c ast.ColumnName, f Field) (Row, error) {
 }
 
 // Read reads the row data from local file.
-func (t Table) read(k key) (Row, error) {
+func (t Table) read(k ds.BtreeKey) (Row, error) {
 	f, err := os.OpenFile(t.dataPath(), os.O_RDONLY, 0666)
 	if err != nil {
 		return nil, err

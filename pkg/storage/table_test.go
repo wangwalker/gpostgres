@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/wangwalker/gpostgres/pkg/ast"
+	"github.com/wangwalker/gpostgres/pkg/ds"
 )
 
 func init() {
@@ -227,7 +228,7 @@ func TestSaveRowsAndSearchWithIndex(t *testing.T) {
 	if n := t1.index.get("age"); n == nil {
 		t.Errorf("index is not created")
 	}
-	var k key
+	var k ds.BtreeKey
 	var v uint16
 	// k.Offset should increase by the order of the rows
 	if k = t1.index.search("name", "wang"); k.Offset < v {
