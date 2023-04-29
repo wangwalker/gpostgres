@@ -84,16 +84,16 @@ func TestIndexInsertAndSearchName(t *testing.T) {
 	t1.index.insert("name", "qian", 4, 1, 0, 0)
 
 	// THEN
-	if v := t1.index.search("name", "wang"); v.Offset != 1 {
+	if v := t1.index.search("name", "wang"); v.Data.Offset != 1 {
 		t.Errorf("table index value is not correct")
 	}
-	if v := t1.index.search("name", "li"); v.Offset != 2 {
+	if v := t1.index.search("name", "li"); v.Data.Offset != 2 {
 		t.Errorf("table index value is not correct")
 	}
-	if v := t1.index.search("name", "zhao"); v.Offset != 3 {
+	if v := t1.index.search("name", "zhao"); v.Data.Offset != 3 {
 		t.Errorf("table index value is not correct")
 	}
-	if v := t1.index.search("name", "qian"); v.Offset != 4 {
+	if v := t1.index.search("name", "qian"); v.Data.Offset != 4 {
 		t.Errorf("table index value is not correct")
 	}
 }
@@ -122,16 +122,16 @@ func TestIndexInsertAndSearchAge(t *testing.T) {
 	t1.index.insert("age", "qian", 4, 1, 0, 0)
 
 	// THEN
-	if v := t1.index.search("age", "wang"); v.Offset != 1 {
+	if v := t1.index.search("age", "wang"); v.Data.Offset != 1 {
 		t.Errorf("table index value is not correct")
 	}
-	if v := t1.index.search("age", "li"); v.Offset != 2 {
+	if v := t1.index.search("age", "li"); v.Data.Offset != 2 {
 		t.Errorf("table index value is not correct")
 	}
-	if v := t1.index.search("age", "zhao"); v.Offset != 3 {
+	if v := t1.index.search("age", "zhao"); v.Data.Offset != 3 {
 		t.Errorf("table index value is not correct")
 	}
-	if v := t1.index.search("age", "qian"); v.Offset != 4 {
+	if v := t1.index.search("age", "qian"); v.Data.Offset != 4 {
 		t.Errorf("table index value is not correct")
 	}
 }

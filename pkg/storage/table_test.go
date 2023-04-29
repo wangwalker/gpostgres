@@ -230,20 +230,20 @@ func TestSaveRowsAndSearchWithIndex(t *testing.T) {
 	}
 	var k ds.BtreeKey
 	var v uint16
-	// k.Offset should increase by the order of the rows
-	if k = t1.index.search("name", "wang"); k.Offset < v {
+	// k.Data.Offset should increase by the order of the rows
+	if k = t1.index.search("name", "wang"); k.Data.Offset < v {
 		t.Errorf("index search result is not correct")
 	}
-	v = k.Offset
-	if k = t1.index.search("name", "li"); k.Offset < v {
+	v = k.Data.Offset
+	if k = t1.index.search("name", "li"); k.Data.Offset < v {
 		t.Errorf("index search result is not correct")
 	}
-	v = k.Offset
-	if k = t1.index.search("name", "zhao"); k.Offset < v {
+	v = k.Data.Offset
+	if k = t1.index.search("name", "zhao"); k.Data.Offset < v {
 		t.Errorf("index search result is not correct")
 	}
-	v = k.Offset
-	if k = t1.index.search("name", "qian"); k.Offset < v {
+	v = k.Data.Offset
+	if k = t1.index.search("name", "qian"); k.Data.Offset < v {
 		t.Errorf("index search result is not correct")
 	}
 }

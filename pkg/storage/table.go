@@ -285,10 +285,9 @@ func (t *Table) loadRows() ([]Row, error) {
 		}
 		r, err := t.decodeRow(line)
 		if err != nil {
-			return nil, err
+			continue
 		}
 		rows = append(rows, r)
-
 	}
 	return rows, nil
 }

@@ -1,7 +1,11 @@
 package ds
 
 import (
+	"bufio"
+	"encoding/json"
+	"io"
 	"math/rand"
+	"os"
 
 	"github.com/wangwalker/dsal/linear"
 )
@@ -20,6 +24,11 @@ type IndexData struct {
 // IsEmpty returns true if the IndexData is empty, otherwise false.
 func (d IndexData) IsEmpty() bool {
 	return d.Offset == 0 && d.Length == 0
+}
+
+// size returns the size of the IndexData.
+func (d IndexData) size() int {
+	return 8
 }
 
 // SkipListNode is the node of skip list, key is the key of the node, data is
@@ -160,6 +169,50 @@ func (head *SkipListNode) AllNodes() []*SkipListNode {
 		p = p.Right
 	}
 	return nodes
+}
+
+// Write just writes the unique all node of skip list to the file.
+func (head *SkipListNode) Write(w io.Writer, bytes []byte) error {
+	if head == nil {
+		return nil
+	}
+	if w == nil || bytes == nil || len(bytes) == 0 {
+		return nil
+	}
+	_, err := w.Write(bytes)
+	return err
+}
+
+// Read reads the unique all node of skip list from the file and inserts them
+// into the skip list.
+func (head *SkipListNode) Read(r io.Reader) error {
+	var nodes []*SkipListNode
+	dec := json.NewDecoder(r)
+	err := dec.Decode(&nodes)
+	if err != nil {
+		return err
+	}
+	for _, n := range nodes {
+		head.Insert(n.Key, n.Data)
+	}
+	return nil
+}
+
+// Decode decodes the sstable from the file encoded by json.
+func Decode(p string) []*SkipListNode {
+	f, err := os.Open(p)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+	r := bufio.NewReader(f)
+	dec := json.NewDecoder(r)
+	var t []*SkipListNode
+	err = dec.Decode(&t)
+	if err != nil {
+		return nil
+	}
+	return t
 }
 
 // DicisionMaker is the interface for making dicision about wheather to insert

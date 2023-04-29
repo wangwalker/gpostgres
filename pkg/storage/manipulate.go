@@ -229,11 +229,11 @@ func (t Table) read(k ds.BtreeKey) (Row, error) {
 		return nil, err
 	}
 	defer f.Close()
-	_, err = f.Seek(int64(k.Offset), 0)
+	_, err = f.Seek(int64(k.Data.Offset), 0)
 	if err != nil {
 		return nil, err
 	}
-	b := make([]byte, k.Length)
+	b := make([]byte, k.Data.Length)
 	_, err = f.Read(b)
 	if err != nil {
 		return nil, err

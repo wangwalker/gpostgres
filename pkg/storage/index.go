@@ -61,8 +61,9 @@ func (index *Index) insert(c, n string, offset, length, p, b uint16) {
 	if btree == nil {
 		return
 	}
-	key := ds.BtreeKey{Name: n, Offset: offset, Length: length, Page: p, Block: b}
-	btree.Insert(key, index.Name, c)
+	d := ds.IndexData{Offset: offset, Length: length, Page: p, Block: b}
+	key := ds.BtreeKey{Name: n, Data: d}
+	btree.Insert(key)
 }
 
 // Search searches a key in the B-tree index, f is the indexed field of a row.
@@ -100,7 +101,8 @@ func (t *Table) loadIndex() {
 	t.createIndex()
 	// load index data from disk.
 	for _, c := range t.Columns {
-		path := t.index.path(string(c.Name))
+		cn := string(c.Name)
+		path := t.index.path(cn)
 		f, err := os.Open(path)
 		if err != nil && os.IsNotExist(err) {
 			return
@@ -112,6 +114,9 @@ func (t *Table) loadIndex() {
 			fmt.Printf("decode index failed: %v\n", err)
 			return
 		}
-		t.index.Btrees[string(c.Name)] = &btree
+		if btree.Root == nil || btree.Root.Keys == nil || len(btree.Root.Keys) <= 0 {
+			continue
+		}
+		t.index.Btrees[cn] = &btree
 	}
 }

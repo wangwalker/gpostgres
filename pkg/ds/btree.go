@@ -8,19 +8,11 @@ import (
 )
 
 // BtreeKey is the key of the B-tree. It contains metadata for btree node,
-// name is used to compare the order of Keys, value is used to store other
-// information, such as the offset or id of the row, page and block is the
-// position of the row in the local binary file.
-// Note: we just put all indexes of one column in one file, so every time
-// inserting a new row, we need to update index file of the column. In order
-// to improve performance, we can update file with buffers, and flush the
-// buffers to disk when the buffer is full.
+// name is used to compare the order of Keys, data is the wrapper of the
+// metadata of the index.
 type BtreeKey struct {
-	Name   string `json:"n"`
-	Offset uint16 `json:"v"`
-	Length uint16 `json:"l"`
-	Page   uint16 `json:"p"`
-	Block  uint16 `json:"b"`
+	Name string    `json:"n"`
+	Data IndexData `json:"d"`
 }
 
 func (k BtreeKey) lt(other BtreeKey) bool {
@@ -28,7 +20,7 @@ func (k BtreeKey) lt(other BtreeKey) bool {
 }
 
 func (k BtreeKey) IsEmpty() bool {
-	return k.Name == "" && k.Offset == 0
+	return k.Name == "" && k.Data.Offset == 0 && k.Data.Length == 0
 }
 
 type BtreeNode struct {
@@ -47,6 +39,17 @@ type Btree struct {
 
 func NewBtree(d int) *Btree {
 	return &Btree{Root: &BtreeNode{IsLeaf: true, Level: 1}, degree: d}
+}
+
+// AllNodes returns all nodes of the B-tree.
+func (t *Btree) AllNodes() []*BtreeNode {
+	nodes := make([]*BtreeNode, 0)
+	r := t.Root
+	nodes = append(nodes, r)
+	for i := 0; i < len(r.Children); i++ {
+		nodes = append(nodes, r.Children[i])
+	}
+	return nodes
 }
 
 // SetPath sets the path of the B-tree file.
@@ -76,14 +79,12 @@ func (t *Btree) search(n *BtreeNode, k string) BtreeKey {
 	return t.search(n.Children[i], k)
 }
 
-// Insert inserts a key into the B-tree, which is the outer interface.
-// K is the key of the B-tree, tn is the name of the table, c is the name
-// of the column.
-func (t *Btree) Insert(k BtreeKey, tn, c string) *BtreeNode {
-	return t.insert(t.Root, k, tn, c)
+// Insert inserts a key into the B-tree.
+func (t *Btree) Insert(k BtreeKey) *BtreeNode {
+	return t.insert(t.Root, k)
 }
 
-func (t *Btree) insert(n *BtreeNode, k BtreeKey, tn, c string) *BtreeNode {
+func (t *Btree) insert(n *BtreeNode, k BtreeKey) *BtreeNode {
 	i := len(n.Keys) - 1
 	if n.IsLeaf {
 		n.Keys = append(n.Keys, k)
@@ -92,7 +93,7 @@ func (t *Btree) insert(n *BtreeNode, k BtreeKey, tn, c string) *BtreeNode {
 			n.Keys[j+1] = n.Keys[j]
 		}
 		n.Keys[j+1] = k
-		go t.sync(tn, c)
+		go t.flush()
 		return n
 	}
 	for i >= 0 && k.lt(n.Keys[i]) {
@@ -108,7 +109,7 @@ func (t *Btree) insert(n *BtreeNode, k BtreeKey, tn, c string) *BtreeNode {
 		}
 		i++
 	}
-	return t.insert(n.Children[i], k, tn, c)
+	return t.insert(n.Children[i], k)
 }
 
 // Split node when the number of the keys = [2*t-1].
@@ -205,8 +206,8 @@ func (t *Btree) traverse(n *BtreeNode) {
 	}
 }
 
-// sync writes the btree node data to disk.
-func (tree *Btree) sync(tn, c string) {
+// flush writes the btree node data to disk.
+func (tree *Btree) flush() {
 	path := tree.path
 	if path == "" {
 		return
