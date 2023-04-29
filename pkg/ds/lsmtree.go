@@ -26,6 +26,7 @@ type LSMTree struct {
 	memtableSize      int
 	memtableSizeLimit int
 	sstableSizeLimit  int
+	baseDir           string
 	memtablePath      string
 	sstablePath       string
 }
@@ -38,6 +39,9 @@ func NewLSMTree(baseDir string) *LSMTree {
 		sstable:           make([]*SkipListNode, 0),
 		memtableSizeLimit: memtableSizeLimit,
 		sstableSizeLimit:  sstableSizeLimit,
+		baseDir:           baseDir,
+		memtablePath:      fmt.Sprintf("%s/memtable", baseDir),
+		sstablePath:       fmt.Sprintf("%s/sstable", baseDir),
 	}
 }
 
@@ -45,10 +49,10 @@ func NewLSMTree(baseDir string) *LSMTree {
 // of memtable file, p2 is the path of sstable file.
 func (tree *LSMTree) SetMemtablePath(p1, p2 string) {
 	if p1 != "" {
-		tree.memtablePath = p1
+		tree.memtablePath = fmt.Sprintf("%s/%s", tree.baseDir, p1)
 	}
 	if p2 != "" {
-		tree.sstablePath = p2
+		tree.sstablePath = fmt.Sprintf("%s/%s", tree.baseDir, p2)
 	}
 }
 
@@ -67,13 +71,13 @@ func (tree *LSMTree) SetLimit(l1, l2 int) {
 // the data is updated, otherwise the key and data is inserted into memtable.
 // If the memtable is full, it is flushed to disk.
 func (tree *LSMTree) Insert(k string, d IndexData) {
+	tree.updateMemsize(k, d)
 	if tree.memtable == nil {
 		tree.memtable = NewSkipList(k, d)
 		return
 	}
 	tree.memtable.Insert(k, d)
 	tree.flushMemtable()
-	tree.memtableSize += len(k) + d.size()
 	if tree.memtableSize >= tree.memtableSizeLimit {
 		tree.dumpMemtable()
 	}
@@ -104,6 +108,10 @@ func (tree *LSMTree) Search(k string) IndexData {
 
 // flushMemtable flushes the memtable to disk every time inserts a new row.
 func (tree *LSMTree) flushMemtable() {
+	// check if the base dir exists, if not, create it
+	if _, err := os.Stat(tree.baseDir); os.IsNotExist(err) {
+		os.MkdirAll(tree.baseDir, 0755)
+	}
 	if tree.memtable == nil {
 		return
 	}
@@ -145,7 +153,6 @@ func (tree *LSMTree) dumpMemtable() {
 	// otherwise, construct sstable from memtable and dump memtable to disk
 	w := bufio.NewWriter(f)
 	nodes := tree.memtable.AllNodes()
-	tree.sstable = nodes
 	bytes, err := json.Marshal(nodes)
 	if err != nil {
 		return
@@ -157,6 +164,7 @@ func (tree *LSMTree) dumpMemtable() {
 	// create new memtable
 	tree.memtable = nil
 	tree.memtableSize = 0
+	tree.sstable = nodes
 }
 
 // mergeSstable merges the sstable to disk, and creates a new sstable.
@@ -183,7 +191,7 @@ func (tree *LSMTree) mergeSstable() {
 		c2 = append(c2, c1[j:]...)
 	}
 	// dump c2 to disk
-	f, err := os.OpenFile(tree.sstablePath, os.O_WRONLY|os.O_TRUNC, 0644)
+	f, err := os.OpenFile(tree.sstablePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return
 	}
@@ -214,4 +222,9 @@ func (t sstable) search(k string) IndexData {
 		}
 	}
 	return IndexData{}
+}
+
+// updateMemsize updates the memtable size.
+func (tree *LSMTree) updateMemsize(k string, d IndexData) {
+	tree.memtableSize += len(k) + d.size()
 }
