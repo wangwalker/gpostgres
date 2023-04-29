@@ -210,7 +210,7 @@ func (t Table) search(c ast.ColumnName, f Field) (Row, error) {
 	if t.index == nil {
 		return nil, ErrIndexNotExisted
 	}
-	btree := t.index.get(string(c))
+	btree := t.index.getBtree(string(c))
 	if btree == nil {
 		return nil, ErrIndexNotExisted
 	}

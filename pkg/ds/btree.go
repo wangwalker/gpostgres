@@ -3,7 +3,9 @@ package ds
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -33,12 +35,28 @@ type BtreeNode struct {
 type Btree struct {
 	Root *BtreeNode `json:"r"`
 	// half of the degree of the B-tree
-	degree int
-	path   string
+	Degree int    `json:"d"`
+	Path   string `json:"p"`
 }
 
-func NewBtree(d int) *Btree {
-	return &Btree{Root: &BtreeNode{IsLeaf: true, Level: 1}, degree: d}
+// NewBtree returns a new B-tree with empty root node, d is the degree of the
+// B-tree, p is the path of the B-tree file.
+func NewBtree(d int, p string) *Btree {
+	return &Btree{Root: &BtreeNode{IsLeaf: true, Level: 1}, Degree: d, Path: p}
+}
+
+// Load loads B-tree from disk when launching database.
+func (t *Btree) Load() error {
+	f, err := os.Open(t.Path)
+	if err != nil && os.IsNotExist(err) {
+		return nil
+	}
+	defer f.Close()
+	err = json.NewDecoder(f).Decode(t)
+	if errors.Is(err, io.EOF) {
+		return nil
+	}
+	return err
 }
 
 // AllNodes returns all nodes of the B-tree.
@@ -50,14 +68,6 @@ func (t *Btree) AllNodes() []*BtreeNode {
 		nodes = append(nodes, r.Children[i])
 	}
 	return nodes
-}
-
-// SetPath sets the path of the B-tree file.
-func (tree *Btree) SetPath(path string) {
-	if path == "" {
-		return
-	}
-	tree.path = path
 }
 
 // Search key in the B-tree.
@@ -100,7 +110,7 @@ func (t *Btree) insert(n *BtreeNode, k BtreeKey) *BtreeNode {
 		i--
 	}
 	i++
-	if len(n.Children[i].Keys) == 2*t.degree-1 {
+	if len(n.Children[i].Keys) == 2*t.Degree-1 {
 		t.splitChild(n, i)
 		// recalculate the index after split node
 		i = len(n.Keys) - 1
@@ -124,34 +134,34 @@ func (t *Btree) splitChild(parent *BtreeNode, i int) {
 	Level := child.Level + 1
 	if child.IsLeaf {
 		child1 = &BtreeNode{
-			Keys:     child.Keys[:t.degree-1],
+			Keys:     child.Keys[:t.Degree-1],
 			Children: nil,
 			IsLeaf:   child.IsLeaf,
 			Level:    Level,
 		}
 		child2 = &BtreeNode{
-			Keys:     child.Keys[t.degree:],
+			Keys:     child.Keys[t.Degree:],
 			Children: nil,
 			IsLeaf:   child.IsLeaf,
 			Level:    Level,
 		}
 	} else {
 		child1 = &BtreeNode{
-			Keys:     child.Keys[:t.degree-1],
-			Children: child.Children[:t.degree-1],
+			Keys:     child.Keys[:t.Degree-1],
+			Children: child.Children[:t.Degree-1],
 			IsLeaf:   child.IsLeaf,
 			Level:    Level,
 		}
 		child2 = &BtreeNode{
-			Keys:     child.Keys[t.degree:],
-			Children: child.Children[t.degree:],
+			Keys:     child.Keys[t.Degree:],
+			Children: child.Children[t.Degree:],
 			IsLeaf:   child.IsLeaf,
 			Level:    Level,
 		}
 	}
 
 	subParent := &BtreeNode{
-		Keys:     []BtreeKey{child.Keys[t.degree-1]},
+		Keys:     []BtreeKey{child.Keys[t.Degree-1]},
 		Children: []*BtreeNode{child1, child2},
 		IsLeaf:   false,
 		Level:    child.Level,
@@ -164,7 +174,7 @@ func (t *Btree) splitChild(parent *BtreeNode, i int) {
 // Child is the new node after spliting, it has just one key and two children.
 // It should be called after splitChild to balance tree.
 func (t *Btree) merge(parent, child *BtreeNode, i int) {
-	if len(parent.Keys) == 2*t.degree-1 {
+	if len(parent.Keys) == 2*t.Degree-1 {
 		return
 	}
 	if i == 0 {
@@ -208,7 +218,7 @@ func (t *Btree) traverse(n *BtreeNode) {
 
 // flush writes the btree node data to disk.
 func (tree *Btree) flush() {
-	path := tree.path
+	path := tree.Path
 	if path == "" {
 		return
 	}

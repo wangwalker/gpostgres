@@ -45,15 +45,32 @@ func NewLSMTree(baseDir string) *LSMTree {
 	}
 }
 
-// SetPath sets the path of the memtable file and sstable file, p1 is the path
-// of memtable file, p2 is the path of sstable file.
-func (tree *LSMTree) SetMemtablePath(p1, p2 string) {
-	if p1 != "" {
-		tree.memtablePath = fmt.Sprintf("%s/%s", tree.baseDir, p1)
+// Load loads LSM-Tree from disk when launching database.
+func (tree *LSMTree) Load() error {
+	f, err := os.Open(tree.memtablePath)
+	if err != nil {
+		return err
 	}
-	if p2 != "" {
-		tree.sstablePath = fmt.Sprintf("%s/%s", tree.baseDir, p2)
+	defer f.Close()
+	r := bufio.NewReader(f)
+	if err := json.NewDecoder(r).Decode(&tree.memtable); err != nil {
+		return err
 	}
+	f, err = os.Open(tree.sstablePath)
+	// it is possible that the sstable file does not exist as memtable hasn't
+	// reach the limit, so we just return nil if the file does not exist.
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	defer f.Close()
+	r = bufio.NewReader(f)
+	if err := json.NewDecoder(r).Decode(&tree.sstable); err != nil {
+		return err
+	}
+	return nil
 }
 
 // SetLimit sets the size limit of memtable and sstable, l1 is the size limit
@@ -129,6 +146,7 @@ func (tree *LSMTree) flushMemtable() {
 		fmt.Printf("write memtable to disk failed: %v\n", err)
 		return
 	}
+	w.Flush()
 }
 
 // dumpMemtable dumps the memtable to disk when its size reaches the limit,
