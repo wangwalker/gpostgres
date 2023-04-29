@@ -44,7 +44,7 @@ func TestBtreeWhenHasDefaultDegree(t *testing.T) {
 		IsLeaf: false,
 		Level:  1,
 	}
-	tree := &Btree{Root: r, degree: 2}
+	tree := &Btree{Root: r, Degree: 2}
 
 	// WHEN
 	tree.Insert(makeKey("food", 10))
@@ -100,7 +100,7 @@ func TestBtreeWhenDegreeIs10(t *testing.T) {
 		IsLeaf: true,
 		Level:  1,
 	}
-	tree := &Btree{Root: r, degree: 5}
+	tree := &Btree{Root: r, Degree: 5}
 
 	// WHEN
 	tree.Insert(makeKey("food", 10))

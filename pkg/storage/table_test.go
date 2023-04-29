@@ -221,29 +221,29 @@ func TestSaveRowsAndSearchWithIndex(t *testing.T) {
 	if err != nil {
 		t.Errorf("failed to save rows: %s", err)
 	}
-	if k := t1.index.get("name"); k == nil {
+	if k := t1.index.getBtree("name"); k == nil {
 		t.Errorf("index is not created")
 	}
 	// Now the index value is just the row index
-	if n := t1.index.get("age"); n == nil {
+	if n := t1.index.getBtree("age"); n == nil {
 		t.Errorf("index is not created")
 	}
-	var k ds.BtreeKey
+	var k ds.IndexData
 	var v uint16
 	// k.Data.Offset should increase by the order of the rows
-	if k = t1.index.search("name", "wang"); k.Data.Offset < v {
+	if k = t1.index.search("name", "wang"); k.Offset < v {
 		t.Errorf("index search result is not correct")
 	}
-	v = k.Data.Offset
-	if k = t1.index.search("name", "li"); k.Data.Offset < v {
+	v = k.Offset
+	if k = t1.index.search("name", "li"); k.Offset < v {
 		t.Errorf("index search result is not correct")
 	}
-	v = k.Data.Offset
-	if k = t1.index.search("name", "zhao"); k.Data.Offset < v {
+	v = k.Offset
+	if k = t1.index.search("name", "zhao"); k.Offset < v {
 		t.Errorf("index search result is not correct")
 	}
-	v = k.Data.Offset
-	if k = t1.index.search("name", "qian"); k.Data.Offset < v {
+	v = k.Offset
+	if k = t1.index.search("name", "qian"); k.Offset < v {
 		t.Errorf("index search result is not correct")
 	}
 }
@@ -314,16 +314,16 @@ func TestLoadSchemesAndSaveRow(t *testing.T) {
 	if t2.index == nil {
 		t.Errorf("table index is nil")
 	}
-	if t2.index.get("name") == nil {
+	if t2.index.getBtree("name") == nil {
 		t.Errorf("table index is not loaded")
 	}
-	if t2.index.get("age") == nil {
+	if t2.index.getBtree("age") == nil {
 		t.Errorf("table index is not loaded")
 	}
-	if t2.index.get("name").Root.Keys == nil {
+	if t2.index.getBtree("name").Root.Keys == nil {
 		t.Errorf("table name index should not be nil")
 	}
-	if t2.index.get("age").Root.Keys == nil {
+	if t2.index.getBtree("age").Root.Keys == nil {
 		t.Errorf("table age index should not be nil")
 	}
 }

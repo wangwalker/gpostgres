@@ -83,7 +83,7 @@ For this goal, we need to design meta data format for each table, binary table d
 - [x] Design table meta data format: JOSN
 - [x] Design binary data file format: Avro binary format
 - [x] Design index file format with B-tree
-- [ ] Design index file format with LSM-tree
+- [x] Design index file format with LSM-tree
 
 ### Section 4
 

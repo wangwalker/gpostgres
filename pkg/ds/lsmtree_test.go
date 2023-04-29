@@ -29,18 +29,6 @@ func TestNewLSMTree(t *testing.T) {
 	}
 }
 
-func TestSetMemtablePath(t *testing.T) {
-	dir := fmt.Sprintf("%s/lsmd2", testDir)
-	tree := NewLSMTree(dir)
-	tree.SetMemtablePath("p1", "p2")
-	if tree.memtablePath != fmt.Sprintf("%s/p1", dir) {
-		t.Errorf("tree memtable path is not correct")
-	}
-	if tree.sstablePath != fmt.Sprintf("%s/p2", dir) {
-		t.Errorf("tree sstable path is not correct")
-	}
-}
-
 func TestSetLimit(t *testing.T) {
 	dir := fmt.Sprintf("%s/lsmd3", testDir)
 	tree := NewLSMTree(dir)
