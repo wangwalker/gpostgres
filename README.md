@@ -46,31 +46,31 @@ To achieve this goal, we can split it into several steps below.
 postgres# select * from tusers;
 | name       | age   | 
 |------------+--------
-| 'wwwww'    | 12    | 
-| 'cwwwwwww' | 13    | 
-| 'd'        | 15    | 
+|  wwwww     | 12    | 
+|  cwwwwwww  | 13    | 
+|  d         | 15    | 
 select 3 rows ok!
 postgres# insert into tusers values ('walker', 23) ('jack', 33);
 insert 2 rows ok!
 postgres# select * from tusers;
 | name       | age   | 
 |------------+--------
-| 'wwwww'    | 12    | 
-| 'cwwwwwww' | 13    | 
-| 'd'        | 15    | 
-| 'walker'   | 23    | 
-| 'jack'     | 33    | 
+|  wwwww     | 12    | 
+|  cwwwwwww  | 13    | 
+|  d         | 15    | 
+|  walker    | 23    | 
+|  jack      | 33    | 
 select 5 rows ok!
 postgres# update tusers set name = 'tony' where name == 'd';
 Update 1 row ok!
 postgres# select * from tusers;
 | name       | age   | 
 |------------+--------
-| 'wwwww'    | 12    | 
-| 'cwwwwwww' | 13    | 
-| 'tony'     | 15    | 
-| 'walker'   | 23    | 
-| 'jack'     | 33    | 
+|  wwwww     | 12    | 
+|  cwwwwwww  | 13    | 
+|  tony      | 15    | 
+|  walker    | 23    | 
+|  jack      | 33    | 
 select 5 rows ok!
  ```
 
